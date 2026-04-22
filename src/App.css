@@ -54,6 +54,57 @@ h1 {
   color: #333333;
 }
 
+.actions,
+.inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.actions {
+  margin-bottom: 1rem;
+}
+
+.stack {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 1rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.field label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+input,
+textarea {
+  width: 100%;
+  border: 2px solid #111111;
+  border-radius: 0;
+  background: #ffffff;
+  color: #111111;
+  font: inherit;
+  padding: 0.8rem 0.85rem;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 6.5rem;
+}
+
+input[readonly],
+textarea:disabled,
+button:disabled {
+  background: #f1f1f1;
+}
+
 .status {
   border-radius: 0;
   padding: 0.75rem 0.9rem;
@@ -110,6 +161,54 @@ button:disabled {
   gap: 0.6rem;
 }
 
+.details-secondary {
+  margin-top: 1.25rem;
+}
+
+.debug-panel {
+  margin-top: 1.25rem;
+  border: 2px solid #111111;
+  background: #fafafa;
+  padding: 0.9rem;
+}
+
+.debug-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.debug-header h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.debug-log {
+  display: grid;
+  gap: 0.6rem;
+  max-height: 20rem;
+  overflow: auto;
+}
+
+.debug-empty {
+  margin: 0;
+  color: #555555;
+}
+
+.debug-entry {
+  margin: 0;
+  padding: 0.7rem;
+  border: 2px solid #111111;
+  background: #ffffff;
+  overflow: auto;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .details div {
   background: #fafafa;
   border: 2px solid #111111;
@@ -138,7 +237,19 @@ dd {
     padding: 1.1rem;
   }
 
-  button {
+  button,
+  input,
+  textarea {
     width: 100%;
+  }
+
+  .actions,
+  .inline-actions {
+    display: grid;
+  }
+
+  .debug-header {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

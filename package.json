@@ -4,11 +4,27 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "compact:todo": "compact compile contracts/todo.compact contracts/managed/todo",
+    "sync:todo-assets": "mkdir -p public/zk/todo && rm -rf public/zk/todo/keys public/zk/todo/zkir && cp -r contracts/managed/todo/keys public/zk/todo/ && cp -r contracts/managed/todo/zkir public/zk/todo/",
+    "prepare:todo": "npm run compact:todo && npm run sync:todo-assets",
+    "predev": "npm run sync:todo-assets",
+    "prebuild": "npm run sync:todo-assets",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@midnight-ntwrk/compact-runtime": "^0.15.0",
+    "@midnight-ntwrk/ledger": "^4.0.0",
+    "@midnight-ntwrk/ledger-v8": "^8.0.3",
+    "@midnight-ntwrk/midnight-js-contracts": "^4.0.4",
+    "@midnight-ntwrk/midnight-js-fetch-zk-config-provider": "^4.0.4",
+    "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "^4.0.4",
+    "@midnight-ntwrk/midnight-js-network-id": "^4.0.4",
+    "@midnight-ntwrk/midnight-js-testing": "^2.0.2",
+    "@midnight-ntwrk/midnight-js-types": "^4.0.4",
+    "@midnight-ntwrk/wallet-sdk-address-format": "^3.1.0",
+    "buffer": "^6.0.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -17,6 +33,8 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "typescript": "^5.5.4",
-    "vite": "^5.4.0"
+    "vite": "^5.4.0",
+    "vite-plugin-top-level-await": "^1.6.0",
+    "vite-plugin-wasm": "^3.6.0"
   }
 }
