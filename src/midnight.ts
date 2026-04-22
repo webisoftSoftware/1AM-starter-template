@@ -54,6 +54,14 @@ function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+function summarizeHex(hex: string): string {
+  if (hex.length <= 32) {
+    return hex;
+  }
+
+  return `${hex.slice(0, 16)}...${hex.slice(-16)}`;
+}
+
 function fromHex(hex: string): Uint8Array {
   const normalized = hex.startsWith('0x') ? hex.slice(2) : hex;
   if (normalized.length % 2 !== 0) {
@@ -368,12 +376,22 @@ export async function createConnectedSession(api: OneAmConnectedApi): Promise<Co
     balanceTx: async (tx: UnboundTransaction) => {
       try {
         const txHex = toHex(tx.serialize());
-        debugLog('walletProvider', 'balanceTx:start', { txHexLength: txHex.length });
+        debugLog('walletProvider', 'balanceTx:start', {
+          txHexLength: txHex.length,
+          txHexPreview: summarizeHex(txHex),
+        });
         const balanced = await api.balanceUnsealedTransaction(txHex);
-        debugLog('walletProvider', 'balanceTx:success', { balancedTxHexLength: balanced.tx.length });
+        debugLog('walletProvider', 'balanceTx:success', {
+          balancedTxHexLength: balanced.tx.length,
+          balancedTxHexPreview: summarizeHex(balanced.tx),
+        });
         return Transaction.deserialize('signature', 'proof', 'binding', fromHex(balanced.tx));
       } catch (error) {
-        debugError('walletProvider', 'balanceTx:error', error);
+        debugError('walletProvider', 'balanceTx:error', {
+          error,
+          networkId: config.networkId,
+          substrateNodeUri: config.substrateNodeUri,
+        });
         throw error;
       }
     },
@@ -385,12 +403,21 @@ export async function createConnectedSession(api: OneAmConnectedApi): Promise<Co
     submitTx: async (tx) => {
       try {
         const txHex = toHex(tx.serialize());
-        debugLog('midnightProvider', 'submitTx:start', { txHexLength: txHex.length });
+        debugLog('midnightProvider', 'submitTx:start', {
+          txHexLength: txHex.length,
+          txHexPreview: summarizeHex(txHex),
+          networkId: config.networkId,
+          substrateNodeUri: config.substrateNodeUri,
+        });
         const txId = await api.submitTransaction(txHex);
         debugLog('midnightProvider', 'submitTx:success', { txId });
         return txId ?? '';
       } catch (error) {
-        debugError('midnightProvider', 'submitTx:error', error);
+        debugError('midnightProvider', 'submitTx:error', {
+          error,
+          networkId: config.networkId,
+          substrateNodeUri: config.substrateNodeUri,
+        });
         throw error;
       }
     },

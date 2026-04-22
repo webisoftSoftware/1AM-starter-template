@@ -28,7 +28,7 @@ body {
 }
 
 .panel {
-  width: min(680px, 100%);
+  width: min(1120px, 100%);
   background: #ffffff;
   border: 2px solid #111111;
   border-radius: 0;
@@ -44,18 +44,26 @@ body {
   font-size: 0.75rem;
 }
 
-h1 {
+h1,
+h2,
+h3 {
   margin: 0;
-  font-size: clamp(1.4rem, 4vw, 2rem);
+}
+
+h1 {
+  font-size: clamp(1.5rem, 3vw, 2.3rem);
 }
 
 .lead {
   margin: 0.7rem 0 1rem;
   color: #333333;
+  max-width: 50rem;
 }
 
 .actions,
-.inline-actions {
+.inline-actions,
+.task-actions,
+.tag-row {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
@@ -67,7 +75,7 @@ h1 {
 
 .stack {
   display: grid;
-  gap: 0.9rem;
+  gap: 1rem;
   margin-top: 1rem;
 }
 
@@ -84,7 +92,8 @@ h1 {
 }
 
 input,
-textarea {
+textarea,
+select {
   width: 100%;
   border: 2px solid #111111;
   border-radius: 0;
@@ -101,6 +110,7 @@ textarea {
 
 input[readonly],
 textarea:disabled,
+select:disabled,
 button:disabled {
   background: #f1f1f1;
 }
@@ -158,18 +168,133 @@ button:disabled {
 .details {
   margin: 1rem 0 0;
   display: grid;
-  gap: 0.6rem;
+  gap: 0.75rem;
 }
 
 .details-secondary {
   margin-top: 1.25rem;
 }
 
+.details div {
+  background: #fafafa;
+  border: 2px solid #111111;
+  padding: 0.65rem 0.8rem;
+}
+
+.summary-grid,
+.task-form-grid,
+.filter-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.task-form-grid,
+.filter-grid {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.field-wide {
+  grid-column: 1 / -1;
+}
+
+dt {
+  font-size: 0.76rem;
+  color: #555555;
+}
+
+dd {
+  margin: 0.2rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.composer,
+.filters,
+.task-list-panel,
 .debug-panel {
-  margin-top: 1.25rem;
   border: 2px solid #111111;
   background: #fafafa;
-  padding: 0.9rem;
+  padding: 1rem;
+}
+
+.composer-header,
+.task-list-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.composer-header p,
+.task-list-header p,
+.empty-state,
+.debug-empty {
+  margin: 0;
+  color: #555555;
+}
+
+.task-list {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.task-card {
+  border: 2px solid #111111;
+  background: #ffffff;
+  padding: 1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.task-card-completed {
+  background: #f4f9f1;
+}
+
+.task-main {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.task-title-row,
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.meta-row span,
+.priority-chip,
+.tag-chip {
+  border: 2px solid #111111;
+  padding: 0.25rem 0.55rem;
+  background: #ffffff;
+  font-size: 0.82rem;
+}
+
+.priority-chip {
+  text-transform: capitalize;
+  font-weight: 600;
+}
+
+.priority-low {
+  background: #e8f7ec;
+}
+
+.priority-medium {
+  background: #fff4cf;
+}
+
+.priority-high {
+  background: #ffdede;
+}
+
+.tag-chip-empty {
+  color: #666666;
+}
+
+.debug-panel {
+  margin-top: 1.25rem;
 }
 
 .debug-header {
@@ -181,7 +306,6 @@ button:disabled {
 }
 
 .debug-header h2 {
-  margin: 0;
   font-size: 1rem;
 }
 
@@ -190,11 +314,6 @@ button:disabled {
   gap: 0.6rem;
   max-height: 20rem;
   overflow: auto;
-}
-
-.debug-empty {
-  margin: 0;
-  color: #555555;
 }
 
 .debug-entry {
@@ -209,27 +328,22 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
-.details div {
-  background: #fafafa;
-  border: 2px solid #111111;
-  border-radius: 0;
-  padding: 0.55rem 0.75rem;
-}
-
-dt {
-  font-size: 0.76rem;
-  color: #555555;
-}
-
-dd {
-  margin: 0.2rem 0 0;
-  overflow-wrap: anywhere;
-}
-
 .error {
   margin: 1rem 0 0;
   color: #9b1c1c;
   font-weight: 500;
+}
+
+@media (max-width: 800px) {
+  .summary-grid,
+  .task-form-grid,
+  .filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .field-wide {
+    grid-column: auto;
+  }
 }
 
 @media (max-width: 640px) {
@@ -239,17 +353,19 @@ dd {
 
   button,
   input,
-  textarea {
+  textarea,
+  select {
     width: 100%;
   }
 
   .actions,
-  .inline-actions {
+  .inline-actions,
+  .task-actions,
+  .composer-header,
+  .task-list-header,
+  .debug-header,
+  .task-title-row,
+  .meta-row {
     display: grid;
-  }
-
-  .debug-header {
-    align-items: stretch;
-    flex-direction: column;
   }
 }
