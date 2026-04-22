@@ -62,3 +62,9 @@ Only the main `todo` field matters to the UI. The mirror fields are internal pad
 - If submit fails, inspect the on-page debug log first.
 - If proving fails, check ProofStation health and the returned prover error text.
 - If refresh fails, inspect `src/midnight.ts` first because that is where the patched indexer behavior lives.
+
+## Docker Setup
+
+- The project includes `docker-compose.yml`, `Dockerfile`, and `nginx.conf` for production-style local serving.
+- Run `docker compose up --build` from the repo root, then open `http://localhost:5173`.
+- Nginx serves the Vite build output and listens on port `5173` to match local dev port expectations.

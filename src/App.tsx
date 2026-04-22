@@ -584,7 +584,7 @@ function App() {
             : task,
         ),
       );
-      setFeedback('Task updated locally. Save tasks to persist it on-chain.');
+      setFeedback('Task updated locally. Use Save Local Changes On-Chain to persist.');
     } else {
       setTasks((currentTasks) => [
         {
@@ -598,7 +598,7 @@ function App() {
         },
         ...currentTasks,
       ]);
-      setFeedback('Task added locally. Save tasks to persist it on-chain.');
+      setFeedback('Task added locally. Use Save Local Changes On-Chain to persist.');
     }
 
     resetTaskForm();
@@ -613,7 +613,8 @@ function App() {
       category: task.category ?? '',
       tags: task.tags.join(', '),
     });
-    setFeedback('Editing task locally. Save tasks when ready.');
+    setActiveTab('add');
+    setFeedback('Editing task locally in Add TODO. Save tasks on-chain when ready.');
     setError('');
   };
 
@@ -628,7 +629,7 @@ function App() {
           : task,
       ),
     );
-    setFeedback('Task status updated locally. Save tasks to persist the change on-chain.');
+    setFeedback('Task status updated locally. Use Save Local Changes On-Chain to persist.');
   };
 
   const deleteTask = (taskId: string) => {
@@ -636,7 +637,7 @@ function App() {
     if (editingTaskId === taskId) {
       resetTaskForm();
     }
-    setFeedback('Task removed locally. Save tasks to persist the change on-chain.');
+    setFeedback('Task removed locally. Use Save Local Changes On-Chain to persist.');
   };
 
   const clearSavedContract = () => {
@@ -717,7 +718,7 @@ function App() {
                   onClick={queueTaskSave}
                   disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null || !hasUnsavedChanges}
                 >
-                  {busyAction === 'submit' ? 'Saving...' : 'Save Tasks On-Chain'}
+                  {busyAction === 'submit' ? 'Saving...' : 'Save Local Changes On-Chain'}
                 </button>
               </div>
 
@@ -863,6 +864,26 @@ function App() {
                 </div>
               </dl>
 
+              <section className="chain-sync-panel">
+                <p>Task edits are local first. Click save to commit local changes to the blockchain.</p>
+                <div className="inline-actions chain-sync-actions">
+                  <button
+                    type="button"
+                    onClick={() => session && contractAddress && refreshTasks(session, contractAddress)}
+                    disabled={!session || !contractAddress || busyAction !== null}
+                  >
+                    {busyAction === 'refresh' ? 'Refreshing...' : 'Refresh On-Chain Tasks'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={queueTaskSave}
+                    disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null || !hasUnsavedChanges}
+                  >
+                    {busyAction === 'submit' ? 'Saving...' : 'Save Local Changes On-Chain'}
+                  </button>
+                </div>
+              </section>
+
               <section className="filters">
                 <div className="filter-grid">
                   <div className="field">
@@ -937,13 +958,13 @@ function App() {
 
                         <div className="task-actions">
                           <button type="button" onClick={() => toggleTaskCompletion(task.id)} disabled={busyAction !== null}>
-                            Mark {task.completed ? 'Incomplete' : 'Complete'}
+                            Mark {task.completed ? 'Incomplete' : 'Complete'} Locally
                           </button>
                           <button type="button" onClick={() => startEditingTask(task)} disabled={busyAction !== null}>
-                            Edit Task
+                            Edit Task Locally
                           </button>
                           <button type="button" onClick={() => deleteTask(task.id)} disabled={busyAction !== null}>
-                            Delete Task
+                            Delete Task Locally
                           </button>
                         </div>
                       </article>
