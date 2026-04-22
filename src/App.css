@@ -1,0 +1,144 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap');
+
+:root {
+  font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+  color: #111111;
+  background: #f5f5f2;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    linear-gradient(0deg, rgba(0, 0, 0, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.04) 1px, transparent 1px),
+    #f5f5f2;
+  background-size: 24px 24px;
+}
+
+.page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+}
+
+.panel {
+  width: min(680px, 100%);
+  background: #ffffff;
+  border: 2px solid #111111;
+  border-radius: 0;
+  padding: 1.5rem;
+  box-shadow: 10px 10px 0 #111111;
+}
+
+.eyebrow {
+  margin: 0 0 0.4rem;
+  color: #555555;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(1.4rem, 4vw, 2rem);
+}
+
+.lead {
+  margin: 0.7rem 0 1rem;
+  color: #333333;
+}
+
+.status {
+  border-radius: 0;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.95rem;
+  margin-bottom: 1rem;
+  border: 2px solid #111111;
+}
+
+.status-checking {
+  background: #ececec;
+}
+
+.status-detected {
+  background: #dff7e6;
+}
+
+.status-not-found {
+  background: #ffe1e1;
+}
+
+button {
+  border: 2px solid #111111;
+  border-radius: 0;
+  padding: 0.75rem 1.1rem;
+  font: inherit;
+  font-weight: 600;
+  color: #111111;
+  background: #ffffff;
+  cursor: pointer;
+  box-shadow: 4px 4px 0 #111111;
+  transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+button:hover:enabled {
+  background: #f0f0f0;
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 #111111;
+}
+
+button:active:enabled {
+  transform: translate(0, 0);
+  box-shadow: 2px 2px 0 #111111;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.details {
+  margin: 1rem 0 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.details div {
+  background: #fafafa;
+  border: 2px solid #111111;
+  border-radius: 0;
+  padding: 0.55rem 0.75rem;
+}
+
+dt {
+  font-size: 0.76rem;
+  color: #555555;
+}
+
+dd {
+  margin: 0.2rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.error {
+  margin: 1rem 0 0;
+  color: #9b1c1c;
+  font-weight: 500;
+}
+
+@media (max-width: 640px) {
+  .panel {
+    padding: 1.1rem;
+  }
+
+  button {
+    width: 100%;
+  }
+}
