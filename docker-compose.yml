@@ -1,0 +1,9 @@
+services:
+  dapp-example:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dapp-example
+    ports:
+      - "5173:5173"
+    restart: unless-stopped
