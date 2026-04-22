@@ -15,6 +15,7 @@ type WalletStatus = 'checking' | 'detected' | 'not-found';
 type BusyAction = 'connect' | 'deploy' | 'submit' | 'refresh' | null;
 type Priority = 'low' | 'medium' | 'high';
 type StatusFilter = 'all' | 'pending' | 'completed';
+type AppTab = 'add' | 'list' | 'debug';
 
 type ContractSnapshot = {
   contractState: CompactContractState;
@@ -225,6 +226,7 @@ function App() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [priorityFilter, setPriorityFilter] = useState<'all' | Priority>('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [activeTab, setActiveTab] = useState<AppTab>('add');
   const [lastTxId, setLastTxId] = useState('');
   const [feedback, setFeedback] = useState('Connect 1AM to deploy the contract and manage your tasks.');
   const [error, setError] = useState('');
@@ -270,9 +272,9 @@ function App() {
   }, []);
 
   const statusText = useMemo(() => {
-    if (walletStatus === 'checking') return 'Checking for 1AM extension...';
-    if (walletStatus === 'detected') return '1AM extension detected.';
-    return '1AM extension not detected. Make sure it is enabled, then refresh.';
+    if (walletStatus === 'checking') return 'Checking 1AM';
+    if (walletStatus === 'detected') return '1AM detected';
+    return '1AM not found';
   }, [walletStatus]);
 
   const categories = useMemo(
@@ -645,281 +647,339 @@ function App() {
   return (
     <main className="page">
       <section className="panel">
-        <p className="eyebrow">1AM + Midnight</p>
-        <h1>On-Chain Task Board</h1>
-        <p className="lead">Manage a full task list on Midnight with completion state, due dates, priorities, categories, and tags.</p>
+        <header className="panel-top">
+          <div>
+            <p className="eyebrow">1AM + Midnight</p>
+            <h1>On-Chain Task Board</h1>
+            <p className="lead">Manage a full task list on Midnight with completion state, due dates, priorities, categories, and tags.</p>
+          </div>
+          <div className="panel-top-actions">
+            <button
+              type="button"
+              className="connect-button"
+              onClick={connectWallet}
+              disabled={walletStatus !== 'detected' || busyAction !== null}
+            >
+              {busyAction === 'connect' ? 'Connecting...' : 'Connect 1AM'}
+            </button>
+            <span className={`wallet-indicator wallet-indicator-${walletStatus}`}>{statusText}</span>
+          </div>
+        </header>
 
-        <div className={`status status-${walletStatus}`}>{statusText}</div>
-
-        <div className="actions">
-          <button type="button" onClick={connectWallet} disabled={walletStatus !== 'detected' || busyAction !== null}>
-            {busyAction === 'connect' ? 'Connecting...' : 'Connect 1AM'}
-          </button>
-
-          <button type="button" onClick={deployTaskContract} disabled={!session || busyAction !== null || !!contractAddress}>
-            {busyAction === 'deploy' ? 'Deploying...' : 'Deploy Task Contract'}
-          </button>
-
+        <div className="tabs" role="tablist" aria-label="Task board sections">
           <button
             type="button"
-            onClick={() => session && contractAddress && refreshTasks(session, contractAddress)}
-            disabled={!session || !contractAddress || busyAction !== null}
+            role="tab"
+            className={`tab-button ${activeTab === 'add' ? 'tab-button-active' : ''}`}
+            aria-selected={activeTab === 'add'}
+            onClick={() => setActiveTab('add')}
           >
-            {busyAction === 'refresh' ? 'Refreshing...' : 'Refresh On-Chain Tasks'}
+            Add TODO
           </button>
-
           <button
             type="button"
-            onClick={queueTaskSave}
-            disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null || !hasUnsavedChanges}
+            role="tab"
+            className={`tab-button ${activeTab === 'list' ? 'tab-button-active' : ''}`}
+            aria-selected={activeTab === 'list'}
+            onClick={() => setActiveTab('list')}
           >
-            {busyAction === 'submit' ? 'Saving...' : 'Save Tasks On-Chain'}
+            See TODOs
+          </button>
+          <button
+            type="button"
+            role="tab"
+            className={`tab-button ${activeTab === 'debug' ? 'tab-button-active' : ''}`}
+            aria-selected={activeTab === 'debug'}
+            onClick={() => setActiveTab('debug')}
+          >
+            Debug
           </button>
         </div>
 
-        {session && (
-          <dl className="details">
-            <div>
-              <dt>Network</dt>
-              <dd>{session.config.networkId}</dd>
-            </div>
-            <div>
-              <dt>Indexer</dt>
-              <dd>{session.config.indexerUri}</dd>
-            </div>
-            <div>
-              <dt>Unshielded address</dt>
-              <dd>{session.unshieldedAddress}</dd>
-            </div>
-          </dl>
-        )}
+        <section className="tab-content">
+          {activeTab === 'add' && (
+            <div className="tab-pane tab-pane-scroll" role="tabpanel" aria-label="Add TODO tab">
+              <div className="actions">
+                <button type="button" onClick={deployTaskContract} disabled={!session || busyAction !== null || !!contractAddress}>
+                  {busyAction === 'deploy' ? 'Deploying...' : 'Deploy Task Contract'}
+                </button>
 
-        <div className="stack">
-          <div className="field">
-            <label htmlFor="contract-address">Contract address</label>
-            <input id="contract-address" value={contractAddress || 'Not deployed yet'} readOnly />
-          </div>
-
-          <div className="inline-actions">
-            <button type="button" onClick={clearSavedContract} disabled={!contractAddress || busyAction !== null}>
-              Forget Saved Contract
-            </button>
-            <button type="button" onClick={resetTaskForm} disabled={busyAction !== null || !editingTaskId}>
-              Cancel Edit
-            </button>
-          </div>
-
-          <section className="composer">
-            <div className="composer-header">
-              <h2>{editingTaskId ? 'Edit Task' : 'Add Task'}</h2>
-              <p>{editingTaskId ? 'Update the task locally, then save on-chain.' : 'Build your next task locally, then save on-chain.'}</p>
-            </div>
-
-            <div className="task-form-grid">
-              <div className="field field-wide">
-                <label htmlFor="task-title">Title</label>
-                <input
-                  id="task-title"
-                  value={taskForm.title}
-                  onChange={(event) => setTaskForm((current) => ({ ...current, title: event.target.value }))}
-                  placeholder="Ship task editing on Midnight"
-                  disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null}
-                />
-              </div>
-
-              <div className="field">
-                <label htmlFor="task-due-date">Due date</label>
-                <input
-                  id="task-due-date"
-                  type="date"
-                  value={taskForm.dueDate}
-                  onChange={(event) => setTaskForm((current) => ({ ...current, dueDate: event.target.value }))}
-                  disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null}
-                />
-              </div>
-
-              <div className="field">
-                <label htmlFor="task-priority">Priority</label>
-                <select
-                  id="task-priority"
-                  value={taskForm.priority}
-                  onChange={(event) => setTaskForm((current) => ({ ...current, priority: event.target.value as Priority }))}
-                  disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null}
+                <button
+                  type="button"
+                  onClick={() => session && contractAddress && refreshTasks(session, contractAddress)}
+                  disabled={!session || !contractAddress || busyAction !== null}
                 >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                </select>
+                  {busyAction === 'refresh' ? 'Refreshing...' : 'Refresh On-Chain Tasks'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={queueTaskSave}
+                  disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null || !hasUnsavedChanges}
+                >
+                  {busyAction === 'submit' ? 'Saving...' : 'Save Tasks On-Chain'}
+                </button>
               </div>
 
-              <div className="field">
-                <label htmlFor="task-category">Category</label>
-                <input
-                  id="task-category"
-                  value={taskForm.category}
-                  onChange={(event) => setTaskForm((current) => ({ ...current, category: event.target.value }))}
-                  placeholder="Product"
-                  disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null}
-                />
-              </div>
+              {session && (
+                <dl className="details">
+                  <div>
+                    <dt>Network</dt>
+                    <dd>{session.config.networkId}</dd>
+                  </div>
+                  <div>
+                    <dt>Indexer</dt>
+                    <dd>{session.config.indexerUri}</dd>
+                  </div>
+                  <div>
+                    <dt>Unshielded address</dt>
+                    <dd>{session.unshieldedAddress}</dd>
+                  </div>
+                </dl>
+              )}
 
-              <div className="field field-wide">
-                <label htmlFor="task-tags">Tags</label>
-                <input
-                  id="task-tags"
-                  value={taskForm.tags}
-                  onChange={(event) => setTaskForm((current) => ({ ...current, tags: event.target.value }))}
-                  placeholder="wallet, proofstation, midnight"
-                  disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null}
-                />
-              </div>
-            </div>
+              <div className="stack">
+                <div className="field contract-address-row">
+                  <label htmlFor="contract-address">Contract address</label>
+                  <input
+                    id="contract-address"
+                    value={contractAddress || 'Not deployed yet'}
+                    title={contractAddress || 'Not deployed yet'}
+                    readOnly
+                  />
+                </div>
 
-            <div className="inline-actions">
-              <button type="button" onClick={upsertTask} disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null}>
-                {editingTaskId ? 'Update Task Locally' : 'Add Task Locally'}
-              </button>
-            </div>
-          </section>
+                <div className="inline-actions">
+                  <button type="button" onClick={clearSavedContract} disabled={!contractAddress || busyAction !== null}>
+                    Forget Saved Contract
+                  </button>
+                  <button type="button" onClick={resetTaskForm} disabled={busyAction !== null || !editingTaskId}>
+                    Cancel Edit
+                  </button>
+                </div>
 
-          <section className="filters">
-            <div className="filter-grid">
-              <div className="field">
-                <label htmlFor="filter-status">Status</label>
-                <select id="filter-status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
-                  <option value="all">All</option>
-                  <option value="pending">Pending</option>
-                  <option value="completed">Completed</option>
-                </select>
-              </div>
+                <section className="composer composer-compact">
+                  <div className="composer-header">
+                    <h2>{editingTaskId ? 'Edit Task' : 'Add Task'}</h2>
+                    <p>{editingTaskId ? 'Update the task locally, then save on-chain.' : 'Build your next task locally, then save on-chain.'}</p>
+                  </div>
 
-              <div className="field">
-                <label htmlFor="filter-priority">Priority</label>
-                <select id="filter-priority" value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value as 'all' | Priority)}>
-                  <option value="all">All</option>
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                </select>
-              </div>
-
-              <div className="field">
-                <label htmlFor="filter-category">Category</label>
-                <select id="filter-category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
-                  <option value="all">All</option>
-                  {categories.map((category) => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <dl className="details details-secondary summary-grid">
-          <div>
-            <dt>Total tasks</dt>
-            <dd>{tasks.length}</dd>
-          </div>
-          <div>
-            <dt>Pending</dt>
-            <dd>{pendingCount}</dd>
-          </div>
-          <div>
-            <dt>Completed</dt>
-            <dd>{completedCount}</dd>
-          </div>
-          <div>
-            <dt>Unsaved changes</dt>
-            <dd>{hasUnsavedChanges ? 'Yes' : 'No'}</dd>
-          </div>
-          <div>
-            <dt>Last transaction id</dt>
-            <dd>{lastTxId || 'No transaction submitted yet.'}</dd>
-          </div>
-          <div>
-            <dt>Status</dt>
-            <dd>{feedback}</dd>
-          </div>
-        </dl>
-
-        <section className="task-list-panel">
-          <div className="task-list-header">
-            <h2>Tasks</h2>
-            <p>{filteredTasks.length} visible of {tasks.length} total</p>
-          </div>
-
-          {filteredTasks.length === 0 ? (
-            <p className="empty-state">No tasks match the current filters.</p>
-          ) : (
-            <div className="task-list">
-              {filteredTasks.map((task) => (
-                <article className={`task-card ${task.completed ? 'task-card-completed' : ''}`} key={task.id}>
-                  <div className="task-main">
-                    <div className="task-title-row">
-                      <h3>{task.title}</h3>
-                      <span className={`priority-chip priority-${task.priority}`}>{task.priority}</span>
+                  <div className="task-form-grid">
+                    <div className="field field-wide">
+                      <label htmlFor="task-title">Title</label>
+                      <input
+                        id="task-title"
+                        value={taskForm.title}
+                        onChange={(event) => setTaskForm((current) => ({ ...current, title: event.target.value }))}
+                        placeholder="Ship task editing on Midnight"
+                        disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null}
+                      />
                     </div>
 
-                    <div className="meta-row">
-                      <span>{task.completed ? 'Completed' : 'Pending'}</span>
-                      <span>{task.category ?? 'No category'}</span>
-                      <span>{task.dueDate ? `Due ${task.dueDate}` : 'No due date'}</span>
+                    <div className="field">
+                      <label htmlFor="task-due-date">Due date</label>
+                      <input
+                        id="task-due-date"
+                        type="date"
+                        value={taskForm.dueDate}
+                        onChange={(event) => setTaskForm((current) => ({ ...current, dueDate: event.target.value }))}
+                        disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null}
+                      />
                     </div>
 
-                    <div className="tag-row">
-                      {task.tags.length === 0 ? (
-                        <span className="tag-chip tag-chip-empty">No tags</span>
-                      ) : (
-                        task.tags.map((tag) => (
-                          <span className="tag-chip" key={`${task.id}-${tag}`}>
-                            {tag}
-                          </span>
-                        ))
-                      )}
+                    <div className="field">
+                      <label htmlFor="task-priority">Priority</label>
+                      <select
+                        id="task-priority"
+                        value={taskForm.priority}
+                        onChange={(event) => setTaskForm((current) => ({ ...current, priority: event.target.value as Priority }))}
+                        disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null}
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                      </select>
+                    </div>
+
+                    <div className="field">
+                      <label htmlFor="task-category">Category</label>
+                      <input
+                        id="task-category"
+                        value={taskForm.category}
+                        onChange={(event) => setTaskForm((current) => ({ ...current, category: event.target.value }))}
+                        placeholder="Product"
+                        disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null}
+                      />
+                    </div>
+
+                    <div className="field field-wide">
+                      <label htmlFor="task-tags">Tags</label>
+                      <input
+                        id="task-tags"
+                        value={taskForm.tags}
+                        onChange={(event) => setTaskForm((current) => ({ ...current, tags: event.target.value }))}
+                        placeholder="wallet, proofstation, midnight"
+                        disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null}
+                      />
                     </div>
                   </div>
 
-                  <div className="task-actions">
-                    <button type="button" onClick={() => toggleTaskCompletion(task.id)} disabled={busyAction !== null}>
-                      Mark {task.completed ? 'Incomplete' : 'Complete'}
-                    </button>
-                    <button type="button" onClick={() => startEditingTask(task)} disabled={busyAction !== null}>
-                      Edit Task
-                    </button>
-                    <button type="button" onClick={() => deleteTask(task.id)} disabled={busyAction !== null}>
-                      Delete Task
+                  <div className="inline-actions">
+                    <button type="button" onClick={upsertTask} disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null}>
+                      {editingTaskId ? 'Update Task Locally' : 'Add Task Locally'}
                     </button>
                   </div>
-                </article>
-              ))}
+                </section>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'list' && (
+            <div className="tab-pane tab-pane-scroll" role="tabpanel" aria-label="See TODOs tab">
+              <dl className="details details-secondary summary-grid">
+                <div>
+                  <dt>Total tasks</dt>
+                  <dd>{tasks.length}</dd>
+                </div>
+                <div>
+                  <dt>Pending</dt>
+                  <dd>{pendingCount}</dd>
+                </div>
+                <div>
+                  <dt>Completed</dt>
+                  <dd>{completedCount}</dd>
+                </div>
+                <div>
+                  <dt>Unsaved changes</dt>
+                  <dd>{hasUnsavedChanges ? 'Yes' : 'No'}</dd>
+                </div>
+                <div>
+                  <dt>Last transaction id</dt>
+                  <dd>{lastTxId || 'No transaction submitted yet.'}</dd>
+                </div>
+                <div>
+                  <dt>Status</dt>
+                  <dd>{feedback}</dd>
+                </div>
+              </dl>
+
+              <section className="filters">
+                <div className="filter-grid">
+                  <div className="field">
+                    <label htmlFor="filter-status">Status</label>
+                    <select id="filter-status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
+                      <option value="all">All</option>
+                      <option value="pending">Pending</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="filter-priority">Priority</label>
+                    <select id="filter-priority" value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value as 'all' | Priority)}>
+                      <option value="all">All</option>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="filter-category">Category</label>
+                    <select id="filter-category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+                      <option value="all">All</option>
+                      {categories.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </section>
+
+              <section className="task-list-panel">
+                <div className="task-list-header">
+                  <h2>Tasks</h2>
+                  <p>{filteredTasks.length} visible of {tasks.length} total</p>
+                </div>
+
+                {filteredTasks.length === 0 ? (
+                  <p className="empty-state">No tasks match the current filters.</p>
+                ) : (
+                  <div className="task-list">
+                    {filteredTasks.map((task) => (
+                      <article className={`task-card ${task.completed ? 'task-card-completed' : ''}`} key={task.id}>
+                        <div className="task-main">
+                          <div className="task-title-row">
+                            <h3>{task.title}</h3>
+                            <span className={`priority-chip priority-${task.priority}`}>{task.priority}</span>
+                          </div>
+
+                          <div className="meta-row">
+                            <span>{task.completed ? 'Completed' : 'Pending'}</span>
+                            <span>{task.category ?? 'No category'}</span>
+                            <span>{task.dueDate ? `Due ${task.dueDate}` : 'No due date'}</span>
+                          </div>
+
+                          <div className="tag-row">
+                            {task.tags.length === 0 ? (
+                              <span className="tag-chip tag-chip-empty">No tags</span>
+                            ) : (
+                              task.tags.map((tag) => (
+                                <span className="tag-chip" key={`${task.id}-${tag}`}>
+                                  {tag}
+                                </span>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="task-actions">
+                          <button type="button" onClick={() => toggleTaskCompletion(task.id)} disabled={busyAction !== null}>
+                            Mark {task.completed ? 'Incomplete' : 'Complete'}
+                          </button>
+                          <button type="button" onClick={() => startEditingTask(task)} disabled={busyAction !== null}>
+                            Edit Task
+                          </button>
+                          <button type="button" onClick={() => deleteTask(task.id)} disabled={busyAction !== null}>
+                            Delete Task
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
+          )}
+
+          {activeTab === 'debug' && (
+            <div className="tab-pane tab-pane-scroll" role="tabpanel" aria-label="Debug tab">
+              <div className="debug-panel">
+                <div className="debug-header">
+                  <h2>Debug Log</h2>
+                  <button type="button" onClick={() => setDebugEntries([])} disabled={busyAction !== null && debugEntries.length === 0}>
+                    Clear Debug Log
+                  </button>
+                </div>
+                <div className="debug-log">
+                  {debugEntries.length === 0 ? (
+                    <p className="debug-empty">No debug entries yet.</p>
+                  ) : (
+                    debugEntries.map((entry, index) => (
+                      <pre className="debug-entry" key={`${entry.at}-${entry.scope}-${index}`}>
+                        {JSON.stringify(entry, null, 2)}
+                      </pre>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </section>
 
         {error && <p className="error">{error}</p>}
-
-        <div className="debug-panel">
-          <div className="debug-header">
-            <h2>Debug Log</h2>
-            <button type="button" onClick={() => setDebugEntries([])} disabled={busyAction !== null && debugEntries.length === 0}>
-              Clear Debug Log
-            </button>
-          </div>
-          <div className="debug-log">
-            {debugEntries.length === 0 ? (
-              <p className="debug-empty">No debug entries yet.</p>
-            ) : (
-              debugEntries.map((entry, index) => (
-                <pre className="debug-entry" key={`${entry.at}-${entry.scope}-${index}`}>
-                  {JSON.stringify(entry, null, 2)}
-                </pre>
-              ))
-            )}
-          </div>
-        </div>
       </section>
     </main>
   );
