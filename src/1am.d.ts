@@ -18,6 +18,7 @@ declare global {
     getProvingProvider: (
       zkConfigProvider: import('@midnight-ntwrk/midnight-js-types').ZKConfigProvider<string>,
     ) => Promise<import('@midnight-ntwrk/ledger-v8').ProvingProvider>;
+    signData: (data: string, options: { encoding: 'hex' | 'base64' | 'text' }) => Promise<string>;
     balanceUnsealedTransaction: (txHex: string) => Promise<{ tx: string }>;
     submitTransaction: (txHex: string) => Promise<string>;
   }

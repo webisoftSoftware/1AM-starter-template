@@ -9,13 +9,16 @@ import { ChargedState, ContractState as CompactContractState, sampleSigningKey }
 import { LedgerParameters, ZswapChainState } from '@midnight-ntwrk/ledger-v8';
 import { debugError, debugLog, subscribeDebugLogs, type DebugEntry } from './debug';
 import { createConnectedSession, type ConnectedSession } from './midnight';
+import { decryptTodoPayload, encryptTodoPayload, isEncryptedTodoPayload } from './confidentialTodo';
 import { compiledTodoContract, todoLedger } from './todoContract';
+import { compiledShieldedTodoContract } from './shieldedTodoContract';
 
 type WalletStatus = 'checking' | 'detected' | 'not-found';
 type BusyAction = 'connect' | 'deploy' | 'submit' | 'refresh' | null;
 type Priority = 'low' | 'medium' | 'high';
 type StatusFilter = 'all' | 'pending' | 'completed';
 type AppTab = 'add' | 'list' | 'debug';
+type PrivacyMode = 'unshielded' | 'shielded';
 
 type ContractSnapshot = {
   contractState: CompactContractState;
@@ -50,12 +53,33 @@ type TaskFormState = {
 
 const DETECT_TIMEOUT_MS = 6000;
 const DETECT_INTERVAL_MS = 300;
-const CONTRACT_ADDRESS_STORAGE_KEY = 'todo-contract-address';
+const PUBLIC_CONTRACT_ADDRESS_STORAGE_KEY = 'todo-contract-address-unshielded';
+const SHIELDED_CONTRACT_ADDRESS_STORAGE_KEY = 'todo-contract-address-shielded';
+const SHIELDED_PAYLOAD_STORAGE_PREFIX = 'todo-shielded-payload:';
 const EMPTY_TASKS_PAYLOAD: TaskListPayload = { version: 1, tasks: [] };
 const BRAND_LOGO_SRC = '/branding/1am-logo-black.svg';
 
-function readStoredContractAddress(): string {
-  return window.localStorage.getItem(CONTRACT_ADDRESS_STORAGE_KEY) ?? '';
+function readStoredContractAddress(storageKey: string): string {
+  return window.localStorage.getItem(storageKey) ?? '';
+}
+
+function shieldedPayloadStorageKey(contractAddress: string): string {
+  return `${SHIELDED_PAYLOAD_STORAGE_PREFIX}${contractAddress}`;
+}
+
+function readStoredShieldedPayload(contractAddress: string): string {
+  return window.localStorage.getItem(shieldedPayloadStorageKey(contractAddress)) ?? '';
+}
+
+function writeStoredShieldedPayload(contractAddress: string, payload: string): void {
+  window.localStorage.setItem(shieldedPayloadStorageKey(contractAddress), payload);
+}
+
+function clearStoredShieldedPayload(contractAddress: string): void {
+  if (!contractAddress) {
+    return;
+  }
+  window.localStorage.removeItem(shieldedPayloadStorageKey(contractAddress));
 }
 
 function defaultTaskFormState(): TaskFormState {
@@ -227,10 +251,12 @@ function isMissingPublicStateError(error: unknown): boolean {
 }
 
 function App() {
+  const [privacyMode, setPrivacyMode] = useState<PrivacyMode>('unshielded');
+  const [confidentialMode, setConfidentialMode] = useState(false);
   const [walletStatus, setWalletStatus] = useState<WalletStatus>('checking');
   const [session, setSession] = useState<ConnectedSession | null>(null);
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
-  const [contractAddress, setContractAddress] = useState(() => readStoredContractAddress());
+  const [contractAddress, setContractAddress] = useState(() => readStoredContractAddress(PUBLIC_CONTRACT_ADDRESS_STORAGE_KEY));
   const [contractSnapshot, setContractSnapshot] = useState<ContractSnapshot | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [savedPayload, setSavedPayload] = useState(() => serializeTaskPayload([]));
@@ -290,6 +316,8 @@ function App() {
   }, [walletStatus]);
 
   const isConnected = session !== null;
+  const isShieldedMode = privacyMode === 'shielded';
+  const activeStorageKey = isShieldedMode ? SHIELDED_CONTRACT_ADDRESS_STORAGE_KEY : PUBLIC_CONTRACT_ADDRESS_STORAGE_KEY;
 
   const categories = useMemo(
     () => Array.from(new Set(tasks.map((task) => task.category).filter((category): category is string => Boolean(category)))).sort(),
@@ -323,7 +351,10 @@ function App() {
   };
 
   const clearContractState = (feedbackMessage: string) => {
-    window.localStorage.removeItem(CONTRACT_ADDRESS_STORAGE_KEY);
+    window.localStorage.removeItem(activeStorageKey);
+    if (isShieldedMode) {
+      clearStoredShieldedPayload(contractAddress);
+    }
     setContractAddress('');
     setContractSnapshot(null);
     setTasks([]);
@@ -339,6 +370,54 @@ function App() {
     setSavedPayload(serializeTaskPayload(parsed.tasks));
     resetTaskForm();
   };
+
+  const maybeEncryptPayload = async (
+    payloadValue: string,
+    activeSession: ConnectedSession,
+    activeContractAddress: string,
+  ): Promise<string> => {
+    if (!confidentialMode) {
+      return payloadValue;
+    }
+
+    return encryptTodoPayload(payloadValue, {
+      api: activeSession.api,
+      networkId: activeSession.config.networkId,
+      contractAddress: activeContractAddress,
+    });
+  };
+
+  const maybeDecryptPayload = async (
+    payloadValue: string,
+    activeSession: ConnectedSession,
+    activeContractAddress: string,
+  ): Promise<string> => {
+    if (!isEncryptedTodoPayload(payloadValue)) {
+      return payloadValue;
+    }
+
+    return decryptTodoPayload(payloadValue, {
+      api: activeSession.api,
+      networkId: activeSession.config.networkId,
+      contractAddress: activeContractAddress,
+    });
+  };
+
+  useEffect(() => {
+    const storedAddress = readStoredContractAddress(activeStorageKey);
+    setContractAddress(storedAddress);
+    setContractSnapshot(null);
+    setTasks([]);
+    setSavedPayload(serializeTaskPayload([]));
+    setLastTxId('');
+    resetTaskForm();
+    setError('');
+    setFeedback(
+      isShieldedMode
+        ? 'Shielded mode selected. Refresh reloads the shielded private snapshot stored on this device.'
+        : 'Unshielded mode selected. Deploy or load a contract, then refresh indexed on-chain state.',
+    );
+  }, [activeStorageKey, isShieldedMode]);
 
   const connectWallet = async () => {
     const wallet = window.midnight?.['1am'];
@@ -392,9 +471,28 @@ function App() {
         setBusyAction('refresh');
       }
 
+      if (isShieldedMode) {
+        const shieldedPayload = readStoredShieldedPayload(activeContractAddress);
+        if (!shieldedPayload) {
+          setError('No local shielded state snapshot found for this contract. Save once from this wallet to initialize local refresh.');
+          return false;
+        }
+
+        const decodedPayload = await maybeDecryptPayload(shieldedPayload, activeSession, activeContractAddress);
+        loadTasksFromPayload(decodedPayload);
+        setFeedback('Shielded task state reloaded from local private snapshot.');
+        debugLog('app', 'refreshTasks:shielded-local-success', {
+          activeContractAddress,
+          payloadEncrypted: isEncryptedTodoPayload(shieldedPayload),
+          taskCount: parseTaskPayload(decodedPayload).tasks.length,
+        });
+        return true;
+      }
+
       const publicStates = await getPublicStates(activeSession.providers.publicDataProvider, activeContractAddress);
       const ledgerState = todoLedger(publicStates.contractState.data);
-      loadTasksFromPayload(ledgerState.todo);
+      const decodedPayload = await maybeDecryptPayload(ledgerState.todo, activeSession, activeContractAddress);
+      loadTasksFromPayload(decodedPayload);
       setContractSnapshot({
         contractState: publicStates.contractState,
         zswapChainState: publicStates.zswapChainState,
@@ -402,7 +500,8 @@ function App() {
       });
       debugLog('app', 'refreshTasks:success', {
         activeContractAddress,
-        taskCount: parseTaskPayload(ledgerState.todo).tasks.length,
+        payloadEncrypted: isEncryptedTodoPayload(ledgerState.todo),
+        taskCount: parseTaskPayload(decodedPayload).tasks.length,
       });
       return true;
     } catch (refreshError) {
@@ -453,7 +552,7 @@ function App() {
           walletProvider: session.providers.walletProvider,
         },
         {
-          compiledContract: compiledTodoContract,
+          compiledContract: isShieldedMode ? compiledShieldedTodoContract : compiledTodoContract,
           args: [serializeTaskPayload([])],
           signingKey: sampleSigningKey(),
         },
@@ -493,14 +592,19 @@ function App() {
       setSavedPayload(serializeTaskPayload([]));
       resetTaskForm();
       setFeedback('Contract deployment submitted. Loading the indexed task state...');
+      window.localStorage.setItem(activeStorageKey, nextContractAddress);
 
-      const hydrated = await waitForContractSnapshot(session, nextContractAddress);
-      if (hydrated) {
-        window.localStorage.setItem(CONTRACT_ADDRESS_STORAGE_KEY, nextContractAddress);
-        setFeedback('Contract deployed and state loaded. You can now manage tasks.');
+      if (isShieldedMode) {
+        writeStoredShieldedPayload(nextContractAddress, serializeTaskPayload([]));
+        setFeedback('Shielded contract deployed. Local private snapshot initialized; refresh now reloads shielded state from this device.');
       } else {
-        clearContractState('The new contract address never appeared in the preview indexer. Try deploying again.');
-        setError('Deployment did not produce indexed public state, so the provisional contract address was cleared.');
+        const hydrated = await waitForContractSnapshot(session, nextContractAddress);
+        if (hydrated) {
+          setFeedback('Contract deployed and state loaded. You can now manage tasks.');
+        } else {
+          clearContractState('The new contract address never appeared in the preview indexer. Try deploying again.');
+          setError('Deployment did not produce indexed public state, so the provisional contract address was cleared.');
+        }
       }
     } catch (deployError) {
       debugError('app', 'deployTaskContract:error', deployError);
@@ -521,7 +625,7 @@ function App() {
       return;
     }
 
-    if (!contractSnapshot) {
+    if (!isShieldedMode && !contractSnapshot) {
       setError('Contract state is not loaded yet. Refresh the contract state and try again.');
       return;
     }
@@ -531,19 +635,23 @@ function App() {
         contractAddress,
         taskCount: tasks.length,
         payloadLength: nextPayload.length,
+        confidentialMode,
       });
       setBusyAction('submit');
       setError('');
       setFeedback('Proving, balancing, and submitting your updated task list with 1AM...');
 
+      const payloadForChain = await maybeEncryptPayload(nextPayload, session, contractAddress);
+
       const callTxData = await createUnprovenCallTx(session.providers, {
-        compiledContract: compiledTodoContract,
+        compiledContract: isShieldedMode ? compiledShieldedTodoContract : compiledTodoContract,
         contractAddress,
         circuitId: 'storeTodo',
-        args: [nextPayload],
+        args: [payloadForChain],
       });
       debugLog('app', 'saveTasks:unproven-created', {
         taskCount: tasks.length,
+        payloadEncrypted: confidentialMode,
       });
 
       const txId = await submitTxAsync(session.providers, {
@@ -554,19 +662,27 @@ function App() {
 
       setLastTxId(txId);
       setSavedPayload(nextPayload);
-      setContractSnapshot((currentSnapshot) =>
-        currentSnapshot
-          ? {
-              ...currentSnapshot,
-              contractState: (() => {
-                const nextContractState = CompactContractState.deserialize(currentSnapshot.contractState.serialize());
-                nextContractState.data = new ChargedState(callTxData.public.nextContractState);
-                return nextContractState;
-              })(),
-            }
-          : currentSnapshot,
+      if (!isShieldedMode) {
+        setContractSnapshot((currentSnapshot) =>
+          currentSnapshot
+            ? {
+                ...currentSnapshot,
+                contractState: (() => {
+                  const nextContractState = CompactContractState.deserialize(currentSnapshot.contractState.serialize());
+                  nextContractState.data = new ChargedState(callTxData.public.nextContractState);
+                  return nextContractState;
+                })(),
+              }
+            : currentSnapshot,
+        );
+      } else {
+        writeStoredShieldedPayload(contractAddress, payloadForChain);
+      }
+      setFeedback(
+        isShieldedMode
+          ? `Shielded task update submitted${confidentialMode ? ' with confidential payload encryption' : ''}. Refresh reloads your local private snapshot.`
+          : `Task list submitted on-chain${confidentialMode ? ' with confidential payload encryption' : ''}. Use refresh to pull the finalized indexed state.`,
       );
-      setFeedback('Task list submitted on-chain. Use refresh to pull the finalized indexed state.');
     } catch (submitError) {
       debugError('app', 'saveTasks:error', submitError);
       setError(submitError instanceof Error ? submitError.message : 'Task list submission failed.');
@@ -740,7 +856,7 @@ function App() {
                   onClick={deployTaskContract}
                   disabled={!session || busyAction !== null || !!contractAddress}
                 >
-                  {busyAction === 'deploy' ? 'Deploying...' : 'Deploy Task Contract'}
+                  {busyAction === 'deploy' ? 'Deploying...' : `Deploy ${isShieldedMode ? 'Shielded' : 'Unshielded'} Contract`}
                 </button>
 
                 <button
@@ -756,10 +872,37 @@ function App() {
                   type="button"
                   className="button-primary"
                   onClick={queueTaskSave}
-                  disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null || !hasUnsavedChanges}
+                  disabled={
+                    !session ||
+                    !contractAddress ||
+                    (!isShieldedMode && !contractSnapshot) ||
+                    busyAction !== null ||
+                    !hasUnsavedChanges
+                  }
                 >
-                  {busyAction === 'submit' ? 'Saving...' : 'Save Local Changes On-Chain'}
+                  {busyAction === 'submit' ? 'Saving...' : `Save ${isShieldedMode ? 'Shielded' : 'Unshielded'} Changes On-Chain`}
                 </button>
+              </div>
+
+              <div className="inline-actions">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={isShieldedMode}
+                    disabled={busyAction !== null}
+                    onChange={(event) => setPrivacyMode(event.target.checked ? 'shielded' : 'unshielded')}
+                  />{' '}
+                  Post tasks as shielded contract
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={confidentialMode}
+                    disabled={busyAction !== null || !session}
+                    onChange={(event) => setConfidentialMode(event.target.checked)}
+                  />{' '}
+                  Encrypt TODO payload before posting
+                </label>
               </div>
 
               {session && (
@@ -776,12 +919,20 @@ function App() {
                     <dt>Unshielded address</dt>
                     <dd>{session.unshieldedAddress}</dd>
                   </div>
+                  <div>
+                    <dt>Posting mode</dt>
+                    <dd>{isShieldedMode ? 'Shielded contract' : 'Unshielded contract'}</dd>
+                  </div>
+                  <div>
+                    <dt>Payload confidentiality</dt>
+                    <dd>{confidentialMode ? 'Encrypted (wallet-signature key)' : 'Plaintext'}</dd>
+                  </div>
                 </dl>
               )}
 
               <div className="stack">
                 <div className="field contract-address-row">
-                  <label htmlFor="contract-address">Contract address</label>
+                  <label htmlFor="contract-address">Contract address ({isShieldedMode ? 'shielded' : 'unshielded'})</label>
                   <input
                     id="contract-address"
                     value={contractAddress || 'Not deployed yet'}
@@ -813,7 +964,7 @@ function App() {
                         value={taskForm.title}
                         onChange={(event) => setTaskForm((current) => ({ ...current, title: event.target.value }))}
                         placeholder="Ship task editing on Midnight"
-                        disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null}
+                        disabled={!session || !contractAddress || (!isShieldedMode && !contractSnapshot) || busyAction !== null}
                       />
                     </div>
 
@@ -824,7 +975,7 @@ function App() {
                         type="date"
                         value={taskForm.dueDate}
                         onChange={(event) => setTaskForm((current) => ({ ...current, dueDate: event.target.value }))}
-                        disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null}
+                        disabled={!session || !contractAddress || (!isShieldedMode && !contractSnapshot) || busyAction !== null}
                       />
                     </div>
 
@@ -834,7 +985,7 @@ function App() {
                         id="task-priority"
                         value={taskForm.priority}
                         onChange={(event) => setTaskForm((current) => ({ ...current, priority: event.target.value as Priority }))}
-                        disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null}
+                        disabled={!session || !contractAddress || (!isShieldedMode && !contractSnapshot) || busyAction !== null}
                       >
                         <option value="low">Low</option>
                         <option value="medium">Medium</option>
@@ -849,7 +1000,7 @@ function App() {
                         value={taskForm.category}
                         onChange={(event) => setTaskForm((current) => ({ ...current, category: event.target.value }))}
                         placeholder="Product"
-                        disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null}
+                        disabled={!session || !contractAddress || (!isShieldedMode && !contractSnapshot) || busyAction !== null}
                       />
                     </div>
 
@@ -860,13 +1011,17 @@ function App() {
                         value={taskForm.tags}
                         onChange={(event) => setTaskForm((current) => ({ ...current, tags: event.target.value }))}
                         placeholder="wallet, proofstation, midnight"
-                        disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null}
+                        disabled={!session || !contractAddress || (!isShieldedMode && !contractSnapshot) || busyAction !== null}
                       />
                     </div>
                   </div>
 
                   <div className="inline-actions">
-                    <button type="button" onClick={upsertTask} disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null}>
+                    <button
+                      type="button"
+                      onClick={upsertTask}
+                      disabled={!session || !contractAddress || (!isShieldedMode && !contractSnapshot) || busyAction !== null}
+                    >
                       {editingTaskId ? 'Update Task Locally' : 'Add Task Locally'}
                     </button>
                   </div>
@@ -919,9 +1074,15 @@ function App() {
                     type="button"
                     className="button-primary"
                     onClick={queueTaskSave}
-                    disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null || !hasUnsavedChanges}
+                    disabled={
+                      !session ||
+                      !contractAddress ||
+                      (!isShieldedMode && !contractSnapshot) ||
+                      busyAction !== null ||
+                      !hasUnsavedChanges
+                    }
                   >
-                    {busyAction === 'submit' ? 'Saving...' : 'Save Local Changes On-Chain'}
+                    {busyAction === 'submit' ? 'Saving...' : `Save ${isShieldedMode ? 'Shielded' : 'Unshielded'} Changes On-Chain`}
                   </button>
                 </div>
               </section>
