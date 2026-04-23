@@ -52,6 +52,7 @@ const DETECT_TIMEOUT_MS = 6000;
 const DETECT_INTERVAL_MS = 300;
 const CONTRACT_ADDRESS_STORAGE_KEY = 'todo-contract-address';
 const EMPTY_TASKS_PAYLOAD: TaskListPayload = { version: 1, tasks: [] };
+const BRAND_LOGO_SRC = '/branding/1am-logo-black.svg';
 
 function readStoredContractAddress(): string {
   return window.localStorage.getItem(CONTRACT_ADDRESS_STORAGE_KEY) ?? '';
@@ -209,6 +210,18 @@ function makeTaskId(): string {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function toTaskSyncKey(task: Task): string {
+  return JSON.stringify([
+    task.id,
+    task.title,
+    task.completed,
+    task.dueDate,
+    task.priority,
+    task.category,
+    [...task.tags].sort(),
+  ]);
+}
+
 function isMissingPublicStateError(error: unknown): boolean {
   return error instanceof Error && error.message.includes('No public state found at contract address');
 }
@@ -272,10 +285,11 @@ function App() {
   }, []);
 
   const statusText = useMemo(() => {
-    if (walletStatus === 'checking') return 'Checking 1AM';
-    if (walletStatus === 'detected') return '1AM detected';
+    if (walletStatus === 'checking') return 'Checking for 1AM';
     return '1AM not found';
   }, [walletStatus]);
+
+  const isConnected = session !== null;
 
   const categories = useMemo(
     () => Array.from(new Set(tasks.map((task) => task.category).filter((category): category is string => Boolean(category)))).sort(),
@@ -298,6 +312,10 @@ function App() {
   const completedCount = tasks.length - pendingCount;
   const nextPayload = useMemo(() => serializeTaskPayload(tasks), [tasks]);
   const hasUnsavedChanges = nextPayload !== savedPayload;
+  const syncedTaskKeys = useMemo(
+    () => new Set(parseTaskPayload(savedPayload).tasks.map((task) => toTaskSyncKey(task))),
+    [savedPayload],
+  );
 
   const resetTaskForm = () => {
     setTaskForm(defaultTaskFormState());
@@ -649,21 +667,36 @@ function App() {
     <main className="page">
       <section className="panel">
         <header className="panel-top">
-          <div>
-            <p className="eyebrow">1AM + Midnight</p>
-            <h1>On-Chain Task Board</h1>
-            <p className="lead">Manage a full task list on Midnight with completion state, due dates, priorities, categories, and tags.</p>
+          <div className="brand-intro">
+            <img className="brand-logo" src={BRAND_LOGO_SRC} alt="1AM" />
+            <div>
+              <p className="eyebrow">Preview Network</p>
+              <h1>On-Chain Task Board</h1>
+            </div>
           </div>
           <div className="panel-top-actions">
-            <button
-              type="button"
-              className="connect-button"
-              onClick={connectWallet}
-              disabled={walletStatus !== 'detected' || busyAction !== null}
-            >
-              {busyAction === 'connect' ? 'Connecting...' : 'Connect 1AM'}
-            </button>
-            <span className={`wallet-indicator wallet-indicator-${walletStatus}`}>{statusText}</span>
+            {walletStatus === 'detected' ? (
+              <button
+                type="button"
+                className={`connect-button ${isConnected ? 'button-connected' : 'button-primary'}`}
+                onClick={connectWallet}
+                disabled={busyAction !== null || isConnected}
+              >
+                {busyAction === 'connect' ? 'Connecting...' : isConnected ? 'Connected to 1 AM' : 'Connect 1AM'}
+              </button>
+            ) : (
+              <>
+                <span className={`wallet-status-pill wallet-status-pill-${walletStatus}`}>{statusText}</span>
+                {walletStatus === 'not-found' && (
+                  <p className="wallet-install-hint">
+                    get it here:{' '}
+                    <a href="https://1am.xyz/" target="_blank" rel="noreferrer noopener">
+                      https://1am.xyz/
+                    </a>
+                  </p>
+                )}
+              </>
+            )}
           </div>
         </header>
 
@@ -701,12 +734,18 @@ function App() {
           {activeTab === 'add' && (
             <div className="tab-pane tab-pane-scroll" role="tabpanel" aria-label="Add TODO tab">
               <div className="actions">
-                <button type="button" onClick={deployTaskContract} disabled={!session || busyAction !== null || !!contractAddress}>
+                <button
+                  type="button"
+                  className="button-primary"
+                  onClick={deployTaskContract}
+                  disabled={!session || busyAction !== null || !!contractAddress}
+                >
                   {busyAction === 'deploy' ? 'Deploying...' : 'Deploy Task Contract'}
                 </button>
 
                 <button
                   type="button"
+                  className="button-secondary"
                   onClick={() => session && contractAddress && refreshTasks(session, contractAddress)}
                   disabled={!session || !contractAddress || busyAction !== null}
                 >
@@ -715,6 +754,7 @@ function App() {
 
                 <button
                   type="button"
+                  className="button-primary"
                   onClick={queueTaskSave}
                   disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null || !hasUnsavedChanges}
                 >
@@ -869,6 +909,7 @@ function App() {
                 <div className="inline-actions chain-sync-actions">
                   <button
                     type="button"
+                    className="button-secondary"
                     onClick={() => session && contractAddress && refreshTasks(session, contractAddress)}
                     disabled={!session || !contractAddress || busyAction !== null}
                   >
@@ -876,6 +917,7 @@ function App() {
                   </button>
                   <button
                     type="button"
+                    className="button-primary"
                     onClick={queueTaskSave}
                     disabled={!session || !contractAddress || !contractSnapshot || busyAction !== null || !hasUnsavedChanges}
                   >
@@ -930,7 +972,10 @@ function App() {
                 ) : (
                   <div className="task-list">
                     {filteredTasks.map((task) => (
-                      <article className={`task-card ${task.completed ? 'task-card-completed' : ''}`} key={task.id}>
+                      <article
+                        className={`task-card ${syncedTaskKeys.has(toTaskSyncKey(task)) ? 'task-card-synced' : 'task-card-local'} ${task.completed ? 'task-card-completed' : ''}`}
+                        key={task.id}
+                      >
                         <div className="task-main">
                           <div className="task-title-row">
                             <h3>{task.title}</h3>
