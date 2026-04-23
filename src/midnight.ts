@@ -17,6 +17,7 @@ import {
   type WalletProvider,
 } from '@midnight-ntwrk/midnight-js-types';
 import { debugError, debugLog } from './debug';
+import { APP_CONFIG } from './config';
 
 type TodoProviders = ContractProviders<any, 'storeTodo', undefined>;
 
@@ -48,7 +49,7 @@ export type ConnectedSession = {
   unshieldedAddress: string;
 };
 
-const TODO_ASSET_BASE_PATH = '/zk/todo';
+const TODO_ASSET_BASE_PATH = APP_CONFIG.zkTodoAssetBasePath;
 
 function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');

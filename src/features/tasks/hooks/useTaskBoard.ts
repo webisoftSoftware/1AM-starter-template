@@ -11,6 +11,7 @@ import { createConnectedSession, type ConnectedSession } from '../../../midnight
 import { decryptTodoPayload, encryptTodoPayload, isEncryptedTodoPayload } from '../../../confidentialTodo';
 import { compiledTodoContract, todoLedger } from '../../../todoContract';
 import { compiledShieldedTodoContract } from '../../../shieldedTodoContract';
+import { APP_CONFIG } from '../../../config';
 import { defaultTaskFormState, makeTaskId, parseTagsInput, parseTaskPayload, serializeTaskPayload, toTaskSyncKey } from '../domain/taskPayload';
 import {
   clearStoredShieldedPayload,
@@ -309,9 +310,9 @@ export function useTaskBoard() {
       debugLog('app', 'connectWallet:start');
       setBusyAction('connect');
       setError('');
-      setFeedback('Connecting to 1AM on preview...');
+      setFeedback(`Connecting to 1AM on ${APP_CONFIG.oneAmNetwork}...`);
 
-      const api = await wallet.connect('preview');
+      const api = await wallet.connect(APP_CONFIG.oneAmNetwork);
       debugLog('app', 'connectWallet:wallet-connected');
       const connectedSession = await createConnectedSession(api);
       debugLog('app', 'connectWallet:session-created', {
@@ -343,7 +344,7 @@ export function useTaskBoard() {
       debugLog('app', 'deployTaskContract:start');
       setBusyAction('deploy');
       setError('');
-      setFeedback('Deploying the task contract to Midnight preview...');
+      setFeedback(`Deploying the task contract to Midnight ${APP_CONFIG.oneAmNetwork}...`);
 
       const deployTxData = await createUnprovenDeployTx(
         {
@@ -401,7 +402,9 @@ export function useTaskBoard() {
         if (hydrated) {
           setFeedback('Contract deployed and state loaded. You can now manage tasks.');
         } else {
-          clearContractState('The new contract address never appeared in the preview indexer. Try deploying again.');
+          clearContractState(
+            `The new contract address never appeared in the ${APP_CONFIG.oneAmNetwork} indexer. Try deploying again.`,
+          );
           setError('Deployment did not produce indexed public state, so the provisional contract address was cleared.');
         }
       }

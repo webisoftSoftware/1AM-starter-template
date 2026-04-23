@@ -3,6 +3,7 @@ node_modules
 dist
 .DS_Store
 *.tsbuildinfo
+.env
 1am.md
 AGENTS.md
 1AM Marketing
