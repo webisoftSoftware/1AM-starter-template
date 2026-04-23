@@ -849,60 +849,71 @@ function App() {
         <section className="tab-content">
           {activeTab === 'add' && (
             <div className="tab-pane tab-pane-scroll" role="tabpanel" aria-label="Add TODO tab">
-              <div className="actions">
-                <button
-                  type="button"
-                  className="button-primary"
-                  onClick={deployTaskContract}
-                  disabled={!session || busyAction !== null || !!contractAddress}
-                >
-                  {busyAction === 'deploy' ? 'Deploying...' : `Deploy ${isShieldedMode ? 'Shielded' : 'Unshielded'} Contract`}
-                </button>
+              <div className="actions-toolbar">
+                <div className="actions">
+                  <button
+                    type="button"
+                    className="button-primary"
+                    onClick={deployTaskContract}
+                    disabled={!session || busyAction !== null || !!contractAddress}
+                  >
+                    {busyAction === 'deploy' ? 'Deploying...' : `Deploy ${isShieldedMode ? 'Shielded' : 'Unshielded'} Contract`}
+                  </button>
 
-                <button
-                  type="button"
-                  className="button-secondary"
-                  onClick={() => session && contractAddress && refreshTasks(session, contractAddress)}
-                  disabled={!session || !contractAddress || busyAction !== null}
-                >
-                  {busyAction === 'refresh' ? 'Refreshing...' : 'Refresh On-Chain Tasks'}
-                </button>
+                  <button
+                    type="button"
+                    className="button-secondary"
+                    onClick={() => session && contractAddress && refreshTasks(session, contractAddress)}
+                    disabled={!session || !contractAddress || busyAction !== null}
+                  >
+                    {busyAction === 'refresh' ? 'Refreshing...' : 'Refresh On-Chain Tasks'}
+                  </button>
 
-                <button
-                  type="button"
-                  className="button-primary"
-                  onClick={queueTaskSave}
-                  disabled={
-                    !session ||
-                    !contractAddress ||
-                    (!isShieldedMode && !contractSnapshot) ||
-                    busyAction !== null ||
-                    !hasUnsavedChanges
-                  }
-                >
-                  {busyAction === 'submit' ? 'Saving...' : `Save ${isShieldedMode ? 'Shielded' : 'Unshielded'} Changes On-Chain`}
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    className="button-primary"
+                    onClick={queueTaskSave}
+                    disabled={
+                      !session ||
+                      !contractAddress ||
+                      (!isShieldedMode && !contractSnapshot) ||
+                      busyAction !== null ||
+                      !hasUnsavedChanges
+                    }
+                  >
+                    {busyAction === 'submit' ? 'Saving...' : `Save ${isShieldedMode ? 'Shielded' : 'Unshielded'} Changes On-Chain`}
+                  </button>
+                </div>
 
-              <div className="inline-actions">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={isShieldedMode}
-                    disabled={busyAction !== null}
-                    onChange={(event) => setPrivacyMode(event.target.checked ? 'shielded' : 'unshielded')}
-                  />{' '}
-                  Post tasks as shielded contract
-                </label>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={confidentialMode}
-                    disabled={busyAction !== null || !session}
-                    onChange={(event) => setConfidentialMode(event.target.checked)}
-                  />{' '}
-                  Encrypt TODO payload before posting
-                </label>
+                <div className="action-toggles" role="group" aria-label="Posting options">
+                  <label className="toggle-control">
+                    <input
+                      className="toggle-input"
+                      type="checkbox"
+                      checked={isShieldedMode}
+                      disabled={busyAction !== null}
+                      onChange={(event) => setPrivacyMode(event.target.checked ? 'shielded' : 'unshielded')}
+                    />
+                    <span className="toggle-track" aria-hidden="true">
+                      <span className="toggle-thumb" />
+                    </span>
+                    <span className="toggle-text">Shielded contract</span>
+                  </label>
+
+                  <label className="toggle-control">
+                    <input
+                      className="toggle-input"
+                      type="checkbox"
+                      checked={confidentialMode}
+                      disabled={busyAction !== null || !session}
+                      onChange={(event) => setConfidentialMode(event.target.checked)}
+                    />
+                    <span className="toggle-track" aria-hidden="true">
+                      <span className="toggle-thumb" />
+                    </span>
+                    <span className="toggle-text">Encrypt payload</span>
+                  </label>
+                </div>
               </div>
 
               {session && (

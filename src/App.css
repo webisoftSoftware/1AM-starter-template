@@ -205,6 +205,96 @@ h3 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.actions-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.actions-toolbar .actions {
+  flex: 1 1 560px;
+}
+
+.action-toggles {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.toggle-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.toggle-track {
+  width: 2.3rem;
+  height: 1.32rem;
+  border-radius: 999px;
+  border: 1px solid var(--gray-400);
+  background: var(--gray-300);
+  position: relative;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.toggle-thumb {
+  width: 0.94rem;
+  height: 0.94rem;
+  border-radius: 50%;
+  background: #ffffff;
+  position: absolute;
+  top: 0.12rem;
+  left: 0.12rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 150ms ease;
+}
+
+.toggle-text {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--gray-700);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.toggle-input:checked + .toggle-track {
+  background: #0f7a43;
+  border-color: #0f7a43;
+}
+
+.toggle-input:checked + .toggle-track .toggle-thumb {
+  transform: translateX(0.96rem);
+}
+
+.toggle-input:focus-visible + .toggle-track {
+  box-shadow: 0 0 0 3px rgba(15, 122, 67, 0.22);
+}
+
+.toggle-input:disabled + .toggle-track {
+  background: var(--gray-200);
+  border-color: var(--gray-300);
+}
+
+.toggle-input:disabled + .toggle-track .toggle-thumb {
+  background: var(--gray-100);
+}
+
+.toggle-input:disabled ~ .toggle-text {
+  color: var(--gray-500);
+}
+
 .stack {
   display: grid;
   gap: 0.9rem;
@@ -635,6 +725,15 @@ dd {
     grid-template-columns: 1fr;
   }
 
+  .actions-toolbar {
+    align-items: stretch;
+  }
+
+  .action-toggles {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
   .summary-grid,
   .task-form-grid,
   .filter-grid {
@@ -677,6 +776,7 @@ dd {
 
   .actions,
   .inline-actions,
+  .action-toggles,
   .task-actions,
   .composer-header,
   .task-list-header,
