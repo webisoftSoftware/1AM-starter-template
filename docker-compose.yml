@@ -1,0 +1,13 @@
+services:
+  dapp-example:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_1AM_NETWORK: ${VITE_1AM_NETWORK:-preview}
+        VITE_ZK_TODO_ASSET_BASE_PATH: ${VITE_ZK_TODO_ASSET_BASE_PATH:-/zk/todo}
+        VITE_ZK_SHIELDED_TODO_ASSET_BASE_PATH: ${VITE_ZK_SHIELDED_TODO_ASSET_BASE_PATH:-/zk/shieldedTodo}
+    container_name: dapp-example
+    ports:
+      - "5173:5173"
+    restart: unless-stopped

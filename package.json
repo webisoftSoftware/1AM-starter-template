@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "compact:todo": "compact compile contracts/todo.compact contracts/managed/todo",
+    "compact:shielded-todo": "compact compile contracts/shieldedTodo.compact contracts/managed/shieldedTodo",
     "sync:todo-assets": "mkdir -p public/zk/todo && rm -rf public/zk/todo/keys public/zk/todo/zkir && cp -r contracts/managed/todo/keys public/zk/todo/ && cp -r contracts/managed/todo/zkir public/zk/todo/",
-    "prepare:todo": "npm run compact:todo && npm run sync:todo-assets",
-    "predev": "npm run sync:todo-assets",
-    "prebuild": "npm run sync:todo-assets",
+    "sync:shielded-todo-assets": "mkdir -p public/zk/shieldedTodo && rm -rf public/zk/shieldedTodo/keys public/zk/shieldedTodo/zkir && cp -r contracts/managed/shieldedTodo/keys public/zk/shieldedTodo/ && cp -r contracts/managed/shieldedTodo/zkir public/zk/shieldedTodo/",
+    "prepare:todo": "npm run compact:todo && npm run compact:shielded-todo && npm run sync:todo-assets && npm run sync:shielded-todo-assets",
+    "predev": "npm run sync:todo-assets && npm run sync:shielded-todo-assets",
+    "prebuild": "npm run sync:todo-assets && npm run sync:shielded-todo-assets",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview"
