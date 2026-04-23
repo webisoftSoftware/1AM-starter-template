@@ -9,16 +9,6 @@ export ledger todoMirrorC: Opaque<"string">;
 export ledger todoMirrorD: Opaque<"string">;
 export ledger todoMirrorE: Opaque<"string">;
 export ledger todoMirrorF: Opaque<"string">;
-export ledger todoMirrorG: Opaque<"string">;
-export ledger todoMirrorH: Opaque<"string">;
-export ledger todoMirrorI: Opaque<"string">;
-export ledger todoMirrorJ: Opaque<"string">;
-export ledger todoMirrorK: Opaque<"string">;
-export ledger todoMirrorL: Opaque<"string">;
-export ledger todoMirrorM: Opaque<"string">;
-export ledger todoMirrorN: Opaque<"string">;
-export ledger todoMirrorO: Opaque<"string">;
-export ledger todoMirrorP: Opaque<"string">;
 
 constructor(initialTodo: Opaque<"string">) {
   todo = disclose(initialTodo);
@@ -28,16 +18,6 @@ constructor(initialTodo: Opaque<"string">) {
   todoMirrorD = disclose(initialTodo);
   todoMirrorE = disclose(initialTodo);
   todoMirrorF = disclose(initialTodo);
-  todoMirrorG = disclose(initialTodo);
-  todoMirrorH = disclose(initialTodo);
-  todoMirrorI = disclose(initialTodo);
-  todoMirrorJ = disclose(initialTodo);
-  todoMirrorK = disclose(initialTodo);
-  todoMirrorL = disclose(initialTodo);
-  todoMirrorM = disclose(initialTodo);
-  todoMirrorN = disclose(initialTodo);
-  todoMirrorO = disclose(initialTodo);
-  todoMirrorP = disclose(initialTodo);
 }
 
 export circuit storeTodo(nextTodo: Opaque<"string">): [] {
@@ -48,14 +28,4 @@ export circuit storeTodo(nextTodo: Opaque<"string">): [] {
   todoMirrorD = disclose(nextTodo);
   todoMirrorE = disclose(nextTodo);
   todoMirrorF = disclose(nextTodo);
-  todoMirrorG = disclose(nextTodo);
-  todoMirrorH = disclose(nextTodo);
-  todoMirrorI = disclose(nextTodo);
-  todoMirrorJ = disclose(nextTodo);
-  todoMirrorK = disclose(nextTodo);
-  todoMirrorL = disclose(nextTodo);
-  todoMirrorM = disclose(nextTodo);
-  todoMirrorN = disclose(nextTodo);
-  todoMirrorO = disclose(nextTodo);
-  todoMirrorP = disclose(nextTodo);
 }

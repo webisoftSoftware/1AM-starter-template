@@ -26,16 +26,6 @@ export type Ledger = {
   readonly todoMirrorD: string;
   readonly todoMirrorE: string;
   readonly todoMirrorF: string;
-  readonly todoMirrorG: string;
-  readonly todoMirrorH: string;
-  readonly todoMirrorI: string;
-  readonly todoMirrorJ: string;
-  readonly todoMirrorK: string;
-  readonly todoMirrorL: string;
-  readonly todoMirrorM: string;
-  readonly todoMirrorN: string;
-  readonly todoMirrorO: string;
-  readonly todoMirrorP: string;
 }
 
 export type ContractReferenceLocations = any;
