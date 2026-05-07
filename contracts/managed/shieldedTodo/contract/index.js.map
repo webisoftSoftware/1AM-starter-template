@@ -1,8 +1,0 @@
-{
-  "version": 3,
-  "file": "index.js",
-  "sourceRoot": "../../../../",
-  "sources": ["contracts/shieldedTodo.compact"],
-  "names": [],
-  "mappings": ";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;EAYA;;;;;;;;;;MAUA,AAAA,SAQC;;;;;cARwB,UAA0B;;;;;;;;;;;yCAA1B,UAA0B;;;;;;;sEAA1B,UAA0B;;;OAQlD;;;;GAVA;EARD;;;;;UAAY,aAA6B;;;;;;;;;;;;;;;;;;;;;;;;;;;;IARzC;;;;;;;;;yEAA8B;IAC9B;;;;;;;;;yEAAqC;IACrC;;;;;;;;;yEAAqC;IACrC;;;;;;;;;yEAAqC;IACrC;;;;;;;;;yEAAqC;IACrC;;;;;;;;;yEAAqC;IACrC;;;;;;;;;yEAAqC;IAGnC;;;;;;;2HAAgB,aAAW;;yEAAvB;IACJ;;;;;;;2HAAuB,aAAW;;yEAAvB;IACX;;;;;;;2HAAuB,aAAW;;yEAAvB;IACX;;;;;;;2HAAuB,aAAW;;yEAAvB;IACX;;;;;;;2HAAuB,aAAW;;yEAAvB;IACX;;;;;;;2HAAuB,aAAW;;yEAAvB;IACX;;;;;;;2HAAuB,aAAW;;yEAAvB;;;;;;;GACZ;EAED,AAAA,YAQC,4BARwB,UAA0B;IACjD;;;;;;;2HAAgB,UAAQ;;yEAApB;IACJ;;;;;;;2HAAuB,UAAQ;;yEAApB;IACX;;;;;;;2HAAuB,UAAQ;;yEAApB;IACX;;;;;;;2HAAuB,UAAQ;;yEAApB;IACX;;;;;;;2HAAuB,UAAQ;;yEAApB;IACX;;;;;;;2HAAuB,UAAQ;;yEAApB;IACX;;;;;;;2HAAuB,UAAQ;;yEAApB;;GACZ;;;;;;;;;;;;;;;;;;;;;;;;;"
-}

@@ -1,0 +1,36 @@
+pragma language_version 0.23;
+
+import CompactStandardLibrary;
+
+export ledger totalMinted: Uint<64>;
+export ledger mintCount: Counter;
+
+constructor() {
+  totalMinted = 0;
+}
+
+export circuit mintShielded(
+  amount: Uint<64>,
+  mintNonce: Bytes<32>,
+  recipient: ZswapCoinPublicKey
+): [] {
+  const coin = mintShieldedToken(
+    pad(32, "1am-shielded-mint"),
+    disclose(amount),
+    disclose(mintNonce),
+    right<ZswapCoinPublicKey, ContractAddress>(kernel.self())
+  );
+  const qualified = QualifiedShieldedCoinInfo {
+    nonce: coin.nonce,
+    color: coin.color,
+    value: coin.value,
+    mt_index: 0 as Uint<64>
+  };
+  sendShielded(
+    qualified,
+    left<ZswapCoinPublicKey, ContractAddress>(disclose(recipient)),
+    disclose(amount as Uint<128>)
+  );
+  totalMinted = (totalMinted + disclose(amount)) as Uint<64>;
+  mintCount.increment(1);
+}

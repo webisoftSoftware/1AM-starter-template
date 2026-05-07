@@ -18,9 +18,5 @@ function readNonEmpty(value: string | undefined, fallback: string): string {
 
 export const APP_CONFIG = {
   oneAmNetwork: readOneAmNetwork(import.meta.env.VITE_1AM_NETWORK),
-  zkTodoAssetBasePath: readNonEmpty(import.meta.env.VITE_ZK_TODO_ASSET_BASE_PATH, '/zk/todo'),
-  zkShieldedTodoAssetBasePath: readNonEmpty(
-    import.meta.env.VITE_ZK_SHIELDED_TODO_ASSET_BASE_PATH,
-    '/zk/shieldedTodo',
-  ),
+  zkMintAssetBasePath: readNonEmpty(import.meta.env.VITE_ZK_MINT_ASSET_BASE_PATH, '/zk/shieldedMint'),
 } as const;

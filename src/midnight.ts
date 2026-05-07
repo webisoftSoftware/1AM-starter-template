@@ -1,5 +1,5 @@
 import { ContractState } from '@midnight-ntwrk/compact-runtime';
-import { LedgerParameters, Transaction, ZswapChainState } from '@midnight-ntwrk/ledger-v8';
+import { LedgerParameters, type ProvingProvider, Transaction, ZswapChainState } from '@midnight-ntwrk/ledger-v8';
 import { FetchZkConfigProvider } from '@midnight-ntwrk/midnight-js-fetch-zk-config-provider';
 import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
@@ -15,11 +15,12 @@ import {
   type UnboundTransaction,
   type UnshieldedBalances,
   type WalletProvider,
+  ZKConfigProvider,
 } from '@midnight-ntwrk/midnight-js-types';
 import { debugError, debugLog } from './debug';
 import { APP_CONFIG } from './config';
 
-type TodoProviders = ContractProviders<any, 'storeTodo', undefined>;
+export type MintProviders = ContractProviders<any, 'mintShielded', undefined>;
 
 type BrowserPrivateStateProvider = PrivateStateProvider<PrivateStateId, undefined>;
 
@@ -45,11 +46,16 @@ type LatestContractAction = {
 export type ConnectedSession = {
   api: OneAmConnectedApi;
   config: OneAmConfiguration;
-  providers: TodoProviders;
+  providers: MintProviders;
   unshieldedAddress: string;
+  shieldedAddress: {
+    shieldedAddress: string;
+    shieldedCoinPublicKey: string;
+    shieldedEncryptionPublicKey: string;
+  };
 };
 
-const TODO_ASSET_BASE_PATH = APP_CONFIG.zkTodoAssetBasePath;
+const MINT_ASSET_BASE_PATH = APP_CONFIG.zkMintAssetBasePath;
 
 function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -365,12 +371,66 @@ export async function createConnectedSession(api: OneAmConnectedApi): Promise<Co
 
   setNetworkId(config.networkId);
 
-  const zkConfigProvider = new FetchZkConfigProvider<'storeTodo'>(
-    new URL(TODO_ASSET_BASE_PATH, window.location.origin).toString(),
-    window.fetch.bind(window),
+  const NONCE_SEP = '#nonce=';
+  const stripNonce = (keyLocation: string) => {
+    const idx = keyLocation.indexOf(NONCE_SEP);
+    return idx === -1 ? keyLocation : keyLocation.slice(0, idx);
+  };
+  const tagNonce = (keyLocation: string) =>
+    `${keyLocation}${NONCE_SEP}${crypto.randomUUID()}`;
+
+  const zkBaseUrl = new URL(MINT_ASSET_BASE_PATH, window.location.origin).toString();
+  const loggingFetch: typeof window.fetch = async (input, init) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    debugLog('zkConfigProvider', 'fetch:start', { url });
+    const response = await window.fetch(input, init);
+    const contentType = response.headers.get('content-type') ?? '';
+    const contentLength = response.headers.get('content-length');
+    debugLog('zkConfigProvider', 'fetch:response', {
+      url,
+      status: response.status,
+      contentType,
+      contentLength,
+      ok: response.ok,
+      looksLikeHtml: contentType.includes('text/html'),
+    });
+    return response;
+  };
+  const zkConfigProvider = new FetchZkConfigProvider<'mintShielded'>(zkBaseUrl, loggingFetch);
+  debugLog('zkConfigProvider', 'baseURL', { zkBaseUrl });
+
+  // Wrapper: strips the per-call nonce suffix before delegating to the real provider.
+  // Lets us vary keyLocation per prove() call (to defeat the wallet's request-fingerprint
+  // dedup) while still resolving the same artifact files on disk.
+  class NonceStrippingZkConfigProvider extends ZKConfigProvider<string> {
+    constructor(private readonly inner: ZKConfigProvider<string>) {
+      super();
+    }
+    getProverKey(circuitId: string) {
+      return this.inner.getProverKey(stripNonce(circuitId));
+    }
+    getVerifierKey(circuitId: string) {
+      return this.inner.getVerifierKey(stripNonce(circuitId));
+    }
+    getZKIR(circuitId: string) {
+      return this.inner.getZKIR(stripNonce(circuitId));
+    }
+  }
+  const dedupSafeZkConfigProvider = new NonceStrippingZkConfigProvider(
+    zkConfigProvider as unknown as ZKConfigProvider<string>,
   );
 
-  const provingProvider = await api.getProvingProvider(zkConfigProvider);
+  const baseProvingProvider = await api.getProvingProvider(dedupSafeZkConfigProvider);
+  // Wrap so each prove/check call sends a unique keyLocation to the wallet.
+  // The wallet's prove handler doesn't compare keyLocation against anything (it only
+  // forwards bytes from keyMaterial to the proof server), so the nonce suffix is
+  // harmless — it just makes the request fingerprint unique.
+  const provingProvider: ProvingProvider = {
+    check: (serializedPreimage, keyLocation) =>
+      baseProvingProvider.check(serializedPreimage, tagNonce(keyLocation)),
+    prove: (serializedPreimage, keyLocation, overwriteBindingInput) =>
+      baseProvingProvider.prove(serializedPreimage, tagNonce(keyLocation), overwriteBindingInput),
+  };
   const privateStateProvider = createPrivateStateProvider();
 
   const walletProvider: WalletProvider = {
@@ -436,5 +496,6 @@ export async function createConnectedSession(api: OneAmConnectedApi): Promise<Co
       midnightProvider,
     },
     unshieldedAddress: unshieldedAddress.unshieldedAddress,
+    shieldedAddress,
   };
 }

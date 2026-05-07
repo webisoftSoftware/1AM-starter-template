@@ -1,7 +1,7 @@
-import TaskBoardPage from './features/tasks/ui/TaskBoardPage';
+import MintPage from './features/mint/ui/MintPage';
 
 function App() {
-  return <TaskBoardPage />;
+  return <MintPage />;
 }
 
 export default App;
