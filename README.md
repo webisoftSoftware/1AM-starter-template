@@ -1,23 +1,41 @@
-# 1AM Example dApp (Midnight TODO)
+# 1AM Shielded Mint dApp
 
-Minimal example dApp showing how to integrate the 1AM browser extension with a Midnight contract.
+This repository is a minimal React + TypeScript + Vite example that shows how to connect the 1AM browser extension to a Midnight contract and mint a contract-defined shielded token to the connected wallet.
+
+## What It Does
+
+- Detects and connects `window.midnight['1am']`
+- Deploys the `shieldedMint` Compact contract on the configured 1AM network
+- Waits for the deployed contract state to appear in the indexer
+- Mints the contract's shielded token to the wallet's shielded address
+- Refreshes indexed ledger state so you can see the updated counters
+- Exposes a debug tab with the raw connector and transaction logs
+
+## User Flow
+
+1. Connect 1AM on `preview` or `preprod`
+2. Deploy the shielded mint contract
+3. Wait for the indexer to expose the new contract state
+4. Enter an amount and mint shielded tokens to the connected wallet
+5. Refresh to read the latest on-chain ledger values
+
+The UI shows:
+
+- wallet connection status
+- unshielded and shielded recipient addresses
+- deployed contract address
+- `totalMinted` and `mintCount`
+- the last submitted transaction id
+- a debug log for connector and indexer issues
 
 ## Requirements
 
-- 1AM Chrome extension (or Chromium-based browser with 1AM installed)
-- Compact compiler (install guide: https://docs.midnight.network/getting-started/installation) - only required if you modify/recompile contracts
+- 1AM browser extension
 - Node.js 20+ and npm
-- Docker + Docker Compose (optional, only for the containerized run)
+- Compact compiler, only if you change or recompile the contract
+- Docker + Docker Compose, optional
 
-## What this project demonstrates
-
-- Detect and connect `window.midnight['1am']`
-- Build/prove/balance/submit deploy and call transactions through 1AM
-- Read task state from indexer-backed public data provider
-- Support unshielded and shielded task workflows
-- Optional payload encryption using a wallet-signature-derived key
-
-## Quick start
+## Quick Start
 
 ```bash
 npm install
@@ -28,36 +46,39 @@ Open `http://localhost:5173`.
 
 ## Environment
 
-Copy `.env.example` to `.env` and adjust values for your setup.
+Copy `.env.example` to `.env` and adjust the values for your setup.
 
-- `VITE_1AM_NETWORK`: wallet network for 1AM (`preview` or `preprod`)
-- `VITE_ZK_TODO_ASSET_BASE_PATH`: unshielded contract zk assets path
-- `VITE_ZK_SHIELDED_TODO_ASSET_BASE_PATH`: shielded contract zk assets path
-- `DEV_ALLOWED_HOSTS`: comma-separated hostnames allowed by Vite dev server
+- `VITE_1AM_NETWORK`: `preview` or `preprod`
+- `VITE_ZK_MINT_ASSET_BASE_PATH`: zk asset base path for the mint contract
+- `DEV_ALLOWED_HOSTS`: comma-separated hostnames allowed by the Vite dev server
 
-`docker compose build` uses the same `VITE_*` values as build args.
+The app defaults `VITE_ZK_MINT_ASSET_BASE_PATH` to `/zk/shieldedMint`.
 
-## Contract flow
+## Contract Flow
 
-1. Connect wallet on your configured `VITE_1AM_NETWORK`
-2. Deploy task contract
-3. Refresh indexed state
-4. Edit tasks locally
-5. Save local edits on-chain
+The Compact contract in `contracts/shieldedMint.compact` stores two ledger values:
 
-## Code layout
+- `totalMinted`
+- `mintCount`
 
-- `src/midnight.ts`: 1AM session/provider wiring and indexer patch behavior
-- `src/confidentialTodo.ts`: optional payload encryption/decryption
-- `src/features/tasks/hooks/useTaskBoard.ts`: app functionality and state orchestration
-- `src/features/tasks/domain/*`: pure task serialization/parsing logic
-- `src/features/tasks/data/*`: storage helpers
-- `src/features/tasks/ui/*`: frontend rendering components
+The `mintShielded` circuit mints the contract-defined shielded token and sends it to the connected wallet's shielded address. The contract also keeps the compiled zk assets in `contracts/managed/shieldedMint/`, with matching copies served from `public/zk/shieldedMint/`.
 
-The frontend exists to exercise the integration flow; this repo is primarily a reference for 1AM + Midnight functionality.
+## Project Layout
+
+- `src/App.tsx`: app entry point
+- `src/features/mint/hooks/useMint.ts`: connection, deploy, mint, and refresh flow
+- `src/features/mint/ui/*`: mint screen and debug tab
+- `src/midnight.ts`: 1AM session and provider wiring
+- `src/mintContract.ts`: generated Compact contract binding
+- `contracts/shieldedMint.compact`: Compact source
+- `contracts/managed/shieldedMint/`: generated contract artifacts
 
 ## Build
 
 ```bash
 npm run build
 ```
+
+## Docker
+
+The repo also includes `docker-compose.yml`, `Dockerfile`, and `nginx.conf` for production-style local serving. Run `docker compose up --build` from the repo root, then open `http://localhost:5173`.
