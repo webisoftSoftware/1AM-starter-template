@@ -1,102 +1,169 @@
-## 1AM Wallet essentials
-- 1AM is a **self-custodial wallet for Midnight Network**.
-- **Users do not need gas/dust tokens**: transaction fees are sponsored server-side by **ProofStation**.
-- Wallet is injected at:
-  - `window.midnight['1am']`
+# 1AM Wallet Integration Notes
 
-## Detect + connect
+This file is the implementation reference for using 1AM from this starter template. It documents the boundary between the dApp, Midnight SDK, and 1AM wallet.
+
+## Core Model
+
+- The dApp still builds deploy/call transactions with Midnight SDK packages.
+- 1AM supplies wallet keys, proving, balancing, dust sponsorship, and submission.
+- The dApp must host its own compiled contract ZK assets.
+- The dApp must not require Midnight system keys, zswap keys, dust trusted setup files, or `MIDNIGHT_SYSTEM_KEYS_DIR`.
+
+## Detect And Connect
+
 ```ts
 const wallet = window.midnight?.['1am'];
-const api = await wallet.connect('preview'); // or 'preprod'
-```
-- Retry detection if needed because injection may be delayed.
-- `connect(networkId)` returns the connected API.
+if (!wallet) throw new Error('Install the 1AM wallet extension.');
 
-## Main wallet API methods
+const api = await wallet.connect('preview'); // or 'preprod'
+const config = await api.getConfiguration();
+```
+
+Notes:
+
+- Extension injection can be delayed, so UI code should poll briefly before showing "not found".
+- `connect(networkId)` asks the wallet for approval and must match the wallet/network the user is using.
+- Use `api.getConfiguration()` instead of hardcoding indexer/node/proof URLs. `proverServerUri` is optional and not needed when using `getProvingProvider`.
+
+## Connected API Shape
+
 Use these from the connected `api`:
 
-### Addresses / balances
-- `getShieldedAddresses()` → `{ shieldedAddress, shieldedCoinPublicKey, shieldedEncryptionPublicKey }`
-- `getUnshieldedAddress()` → `{ unshieldedAddress }`
-- `getDustAddress()` → `{ dustAddress }`
-- `getShieldedBalances()` → `Record<string, bigint>`
-- `getUnshieldedBalances()` → `Record<string, bigint>`
-- `getDustBalance()` → `{ balance, cap }`
+```ts
+type OneAmConnectedApi = {
+  getConfiguration(): Promise<{
+    networkId: string;
+    indexerUri: string;
+    indexerWsUri: string;
+    proverServerUri?: string;
+    substrateNodeUri: string;
+  }>;
 
-### Network config
-- `getConfiguration()` →  
-  `{ networkId, indexerUri, indexerWsUri, proverServerUri, substrateNodeUri }`
+  getShieldedAddresses(): Promise<{
+    shieldedAddress: string;
+    shieldedCoinPublicKey: string;
+    shieldedEncryptionPublicKey: string;
+  }>;
 
-### Tx/proving
-- `getProvingProvider(zkConfigProvider)` → proving provider
-- `balanceUnsealedTransaction(txHex)` → `{ tx }`
-- `submitTransaction(txHex)` → submits tx
-- `makeTransfer(outputs)` → `{ tx }`
-- `signData(data, options)` → signature
+  getUnshieldedAddress(): Promise<{ unshieldedAddress: string }>;
 
-## Required Midnight provider setup
-Typical flow:
-1. `setNetworkId(config.networkId)`
-2. Build:
-   - `zkConfigProvider` via `FetchZkConfigProvider`
-   - `publicDataProvider` via `indexerPublicDataProvider`
-   - `provingProvider` via `api.getProvingProvider(zkConfigProvider)`
-3. Wrap into providers:
-   - `proofProvider.proveTx(unprovenTx)` → `unprovenTx.prove(...)`
-   - `walletProvider.balanceTx(tx)` → serialize to hex, call `api.balanceUnsealedTransaction(hex)`, deserialize returned tx
-   - `midnightProvider.submitTx(tx)` → serialize to hex, call `api.submitTransaction(hex)`
+  getProvingProvider(keyMaterialProvider: KeyMaterialProvider): Promise<ProvingProvider>;
 
-## Important dust-free transaction flow
-The DApp should follow this exact pattern:
-1. Build unproven tx with Midnight SDK / compiled contract
-2. Prove tx using wallet proving provider
-3. Balance proved tx via `balanceUnsealedTransaction()`  
-   - this is where server-side dust sponsorship happens
-4. Submit via `submitTransaction()`
+  balanceUnsealedTransaction(txHex: string, options?: { payFees?: boolean }): Promise<{ tx: string }>;
+  submitTransaction(txHex: string): Promise<void>;
 
-**Result: user pays 0 dust / 0 NIGHT**
+  signData(
+    data: string,
+    options: { encoding: 'hex' | 'base64' | 'text'; keyType: 'unshielded' },
+  ): Promise<{ data: string; signature: string; verifyingKey: string }>;
+};
+```
 
-## Contract deployment / circuit calls
-Use Midnight SDK packages:
-- `@midnight-ntwrk/compact-js`
-- `@midnight-ntwrk/midnight-js-contracts`
-- related provider packages
+Important details:
 
-Main operations:
-- `deployContract(providers, { compiledContract })`
-- `submitCallTx(providers, { compiledContract, contractAddress, circuitId, args })`
+- `submitTransaction` returns `void`. If the dApp needs a transaction id, derive it from the finalized `Transaction.identifiers()` value before calling 1AM.
+- `signData` returns an object. For local key derivation, use `result.signature`, not the entire result object.
+- `getProvingProvider` expects a key-material provider. With Midnight's fetch provider, pass `zkConfigProvider.asKeyMaterialProvider()`.
 
-## ZK key hosting requirement
-Your compiled contract assets must be hosted on a CDN/server with CORS enabled.
+## Provider Wiring
 
-Expected files:
-- `keys/{circuitId}.prover`
-- `keys/{circuitId}.verifier`
-- `zkir/{circuitId}.bzkir`
+The provider flow in `src/midnight.ts` is the canonical shape:
 
-`FetchZkConfigProvider(baseURL, fetch)` will load from that base path.
+```ts
+const config = await api.getConfiguration();
+setNetworkId(config.networkId);
 
-## Networks
-Supported now:
-- `preview`
-- `preprod`
+const zkConfigProvider = new FetchZkConfigProvider<'storeTodo'>(
+  new URL('/zk/todo', window.location.origin).toString(),
+  window.fetch.bind(window),
+);
 
-Mainnet info is not ready/TBD.
+const provingProvider = await api.getProvingProvider(zkConfigProvider.asKeyMaterialProvider());
+const proofProvider = createProofProvider(provingProvider);
+```
 
-## Important package deps
-- `@midnight-ntwrk/compact-js`
-- `@midnight-ntwrk/midnight-js-contracts`
-- `@midnight-ntwrk/midnight-js-types`
-- `@midnight-ntwrk/midnight-js-fetch-zk-config-provider`
-- `@midnight-ntwrk/midnight-js-indexer-public-data-provider`
-- `@midnight-ntwrk/midnight-js-network-id`
-- `@midnight-ntwrk/ledger-v8`
+Build the remaining Midnight providers around 1AM:
 
-## What matters most for implementation
-- Detect wallet at `window.midnight['1am']`
-- Connect with `await wallet.connect('preview' | 'preprod')`
-- Always use `api.getConfiguration()` to configure providers dynamically
-- Use `api.getProvingProvider(...)` instead of trying to talk to ProofStation directly
-- Always run balancing through `api.balanceUnsealedTransaction(...)`
-- Submit through `api.submitTransaction(...)`
-- Host compiled contract proving/verifier/ZKIR assets correctly
+- `publicDataProvider`: use the wallet's `config.indexerUri` and `config.indexerWsUri`.
+- `walletProvider.getCoinPublicKey`: use `getShieldedAddresses().shieldedCoinPublicKey`.
+- `walletProvider.getEncryptionPublicKey`: use `getShieldedAddresses().shieldedEncryptionPublicKey`.
+- `walletProvider.balanceTx`: serialize the proved unsealed transaction to hex, call `api.balanceUnsealedTransaction(txHex)`, then deserialize the returned finalized transaction.
+- `midnightProvider.submitTx`: derive a transaction id locally, call `api.submitTransaction(txHex)`, then return the local id.
+
+## Transaction Flow
+
+Use this sequence for deploys and circuit calls:
+
+1. Build an unproven transaction with `createUnprovenDeployTx` or `createUnprovenCallTx`.
+2. Prove it through `proofProvider`, which delegates to `api.getProvingProvider(...)`.
+3. Balance it through `api.balanceUnsealedTransaction(...)`.
+4. Submit it through `api.submitTransaction(...)`.
+5. Refresh state from the indexer after submission.
+
+This is where dust-free execution happens: the dApp does not source dust itself.
+
+## ZK Asset Hosting
+
+Each compiled contract circuit must be fetchable from the dApp origin or CDN:
+
+```text
+{baseURL}/
+  keys/
+    {circuitId}.prover
+    {circuitId}.verifier
+  zkir/
+    {circuitId}.bzkir
+```
+
+For this starter:
+
+- Unshielded TODO base path: `/zk/todo`
+- Shielded TODO base path: `/zk/shieldedTodo`
+- Circuit id: `storeTodo`
+
+The app keeps separate provider sets for unshielded and shielded modes so each contract resolves assets from its own base path.
+
+For hosted deployments, make sure these files are served with CORS enabled for the dApp origin. `application/octet-stream` is a good content type for the binary files.
+
+## Contract Artifacts
+
+The repo checks in compiled artifacts under:
+
+- `contracts/managed/todo/`
+- `contracts/managed/shieldedTodo/`
+- `public/zk/todo/`
+- `public/zk/shieldedTodo/`
+
+If you edit a Compact contract, run:
+
+```bash
+npm run prepare:todo
+```
+
+That compiles both contracts and copies generated `keys/` and `zkir/` assets into `public/zk/...`.
+
+Changing a contract or verifier key means old deployed contract addresses should be discarded.
+
+## Optional Payload Encryption
+
+The encrypted payload mode derives a local AES-GCM key from a wallet signature:
+
+```ts
+const signed = await api.signData(message, {
+  encoding: 'text',
+  keyType: 'unshielded',
+});
+
+const signatureBytes = fromHex(signed.signature);
+```
+
+This protects the TODO payload before it is stored in the public ledger field, but it is still an application-level convention. The wallet only signs the derivation message; the dApp does the encryption and decryption in the browser.
+
+## Common Mistakes
+
+- Do not pass the `ZKConfigProvider` object directly to `getProvingProvider`; pass `zkConfigProvider.asKeyMaterialProvider()`.
+- Do not expect `submitTransaction` to return a tx id.
+- Do not treat the `signData` response as a string.
+- Do not add `MIDNIGHT_SYSTEM_KEYS_DIR` or copy system proving keys into this dApp.
+- Do not use one ZK asset base path for multiple contracts unless their circuits and artifacts are intentionally identical.
+- Do not reuse saved contract addresses after recompiling contracts.

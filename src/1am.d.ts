@@ -1,9 +1,20 @@
 declare global {
+  type OneAmSignDataOptions = {
+    encoding: 'hex' | 'base64' | 'text';
+    keyType: 'unshielded';
+  };
+
+  type OneAmSignature = {
+    data: string;
+    signature: string;
+    verifyingKey: string;
+  };
+
   interface OneAmConfiguration {
     networkId: string;
     indexerUri: string;
     indexerWsUri: string;
-    proverServerUri: string;
+    proverServerUri?: string;
     substrateNodeUri: string;
   }
 
@@ -16,11 +27,11 @@ declare global {
     }>;
     getUnshieldedAddress: () => Promise<{ unshieldedAddress: string }>;
     getProvingProvider: (
-      zkConfigProvider: import('@midnight-ntwrk/midnight-js-types').ZKConfigProvider<string>,
+      keyMaterialProvider: import('@midnight-ntwrk/midnight-js-types').KeyMaterialProvider,
     ) => Promise<import('@midnight-ntwrk/ledger-v8').ProvingProvider>;
-    signData: (data: string, options: { encoding: 'hex' | 'base64' | 'text' }) => Promise<string>;
+    signData: (data: string, options: OneAmSignDataOptions) => Promise<OneAmSignature>;
     balanceUnsealedTransaction: (txHex: string) => Promise<{ tx: string }>;
-    submitTransaction: (txHex: string) => Promise<string>;
+    submitTransaction: (txHex: string) => Promise<void>;
   }
 
   interface OneAmWallet {

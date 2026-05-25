@@ -1,5 +1,5 @@
 import { ContractState } from '@midnight-ntwrk/compact-runtime';
-import { LedgerParameters, Transaction, ZswapChainState } from '@midnight-ntwrk/ledger-v8';
+import { LedgerParameters, Transaction, ZswapChainState, type TransactionId } from '@midnight-ntwrk/ledger-v8';
 import { FetchZkConfigProvider } from '@midnight-ntwrk/midnight-js-fetch-zk-config-provider';
 import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
@@ -22,6 +22,7 @@ import { APP_CONFIG } from './config';
 type TodoProviders = ContractProviders<any, 'storeTodo', undefined>;
 
 type BrowserPrivateStateProvider = PrivateStateProvider<PrivateStateId, undefined>;
+type TodoContractMode = 'unshielded' | 'shielded';
 
 type GraphQlResponse<T> = {
   data?: T;
@@ -46,10 +47,14 @@ export type ConnectedSession = {
   api: OneAmConnectedApi;
   config: OneAmConfiguration;
   providers: TodoProviders;
+  providersByMode: Record<TodoContractMode, TodoProviders>;
   unshieldedAddress: string;
 };
 
-const TODO_ASSET_BASE_PATH = APP_CONFIG.zkTodoAssetBasePath;
+const ZK_ASSET_BASE_PATH_BY_MODE: Record<TodoContractMode, string> = {
+  unshielded: APP_CONFIG.zkTodoAssetBasePath,
+  shielded: APP_CONFIG.zkShieldedTodoAssetBasePath,
+};
 
 function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -74,6 +79,12 @@ function fromHex(hex: string): Uint8Array {
     bytes[index / 2] = Number.parseInt(normalized.slice(index, index + 2), 16);
   }
   return bytes;
+}
+
+function transactionIdentifier(tx: { identifiers(): Iterable<unknown> }): TransactionId {
+  const identifiers = Array.from(tx.identifiers());
+  const identifier = identifiers[identifiers.length - 1];
+  return (identifier instanceof Uint8Array ? toHex(identifier) : String(identifier ?? '')) as TransactionId;
 }
 
 function toBigIntBalances(entries: Array<{ tokenType: string; amount: string }>): UnshieldedBalances {
@@ -365,12 +376,6 @@ export async function createConnectedSession(api: OneAmConnectedApi): Promise<Co
 
   setNetworkId(config.networkId);
 
-  const zkConfigProvider = new FetchZkConfigProvider<'storeTodo'>(
-    new URL(TODO_ASSET_BASE_PATH, window.location.origin).toString(),
-    window.fetch.bind(window),
-  );
-
-  const provingProvider = await api.getProvingProvider(zkConfigProvider);
   const privateStateProvider = createPrivateStateProvider();
 
   const walletProvider: WalletProvider = {
@@ -404,15 +409,17 @@ export async function createConnectedSession(api: OneAmConnectedApi): Promise<Co
     submitTx: async (tx) => {
       try {
         const txHex = toHex(tx.serialize());
+        const txId = transactionIdentifier(tx);
         debugLog('midnightProvider', 'submitTx:start', {
           txHexLength: txHex.length,
           txHexPreview: summarizeHex(txHex),
+          txId,
           networkId: config.networkId,
           substrateNodeUri: config.substrateNodeUri,
         });
-        const txId = await api.submitTransaction(txHex);
+        await api.submitTransaction(txHex);
         debugLog('midnightProvider', 'submitTx:success', { txId });
-        return txId ?? '';
+        return txId;
       } catch (error) {
         debugError('midnightProvider', 'submitTx:error', {
           error,
@@ -424,17 +431,37 @@ export async function createConnectedSession(api: OneAmConnectedApi): Promise<Co
     },
   };
 
-  return {
-    api,
-    config,
-    providers: {
+  const createModeProviders = async (mode: TodoContractMode): Promise<TodoProviders> => {
+    const zkConfigProvider = new FetchZkConfigProvider<'storeTodo'>(
+      new URL(ZK_ASSET_BASE_PATH_BY_MODE[mode], window.location.origin).toString(),
+      window.fetch.bind(window),
+    );
+    const provingProvider = await api.getProvingProvider(zkConfigProvider.asKeyMaterialProvider());
+
+    return {
       privateStateProvider,
       publicDataProvider: createPatchedPublicDataProvider(config.indexerUri, config.indexerWsUri),
       zkConfigProvider,
       proofProvider: createProofProvider(provingProvider),
       walletProvider,
       midnightProvider,
-    },
+    };
+  };
+
+  const [unshieldedProviders, shieldedProviders] = await Promise.all([
+    createModeProviders('unshielded'),
+    createModeProviders('shielded'),
+  ]);
+  const providersByMode = {
+    unshielded: unshieldedProviders,
+    shielded: shieldedProviders,
+  };
+
+  return {
+    api,
+    config,
+    providers: unshieldedProviders,
+    providersByMode,
     unshieldedAddress: unshieldedAddress.unshieldedAddress,
   };
 }

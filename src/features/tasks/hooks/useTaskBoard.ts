@@ -253,7 +253,8 @@ export function useTaskBoard() {
         return true;
       }
 
-      const publicStates = await getPublicStates(activeSession.providers.publicDataProvider, activeContractAddress);
+      const providers = activeSession.providersByMode[privacyMode];
+      const publicStates = await getPublicStates(providers.publicDataProvider, activeContractAddress);
       const ledgerState = todoLedger(publicStates.contractState.data);
       const decodedPayload = await maybeDecryptPayload(ledgerState.todo, activeSession, activeContractAddress);
       loadTasksFromPayload(decodedPayload);
@@ -346,10 +347,11 @@ export function useTaskBoard() {
       setError('');
       setFeedback(`Deploying the task contract to Midnight ${APP_CONFIG.oneAmNetwork}...`);
 
+      const providers = session.providersByMode[privacyMode];
       const deployTxData = await createUnprovenDeployTx(
         {
-          zkConfigProvider: session.providers.zkConfigProvider,
-          walletProvider: session.providers.walletProvider,
+          zkConfigProvider: providers.zkConfigProvider,
+          walletProvider: providers.walletProvider,
         },
         {
           compiledContract: isShieldedMode ? compiledShieldedTodoContract : compiledTodoContract,
@@ -363,11 +365,11 @@ export function useTaskBoard() {
 
       const txId = await submitTxAsync(
         {
-          publicDataProvider: session.providers.publicDataProvider,
-          zkConfigProvider: session.providers.zkConfigProvider,
-          proofProvider: session.providers.proofProvider,
-          walletProvider: session.providers.walletProvider,
-          midnightProvider: session.providers.midnightProvider,
+          publicDataProvider: providers.publicDataProvider,
+          zkConfigProvider: providers.zkConfigProvider,
+          proofProvider: providers.proofProvider,
+          walletProvider: providers.walletProvider,
+          midnightProvider: providers.midnightProvider,
         },
         {
           unprovenTx: deployTxData.private.unprovenTx,
@@ -378,8 +380,8 @@ export function useTaskBoard() {
         txId,
       });
 
-      await session.providers.privateStateProvider.setContractAddress(deployTxData.public.contractAddress);
-      await session.providers.privateStateProvider.setSigningKey(
+      await providers.privateStateProvider.setContractAddress(deployTxData.public.contractAddress);
+      await providers.privateStateProvider.setSigningKey(
         deployTxData.public.contractAddress,
         deployTxData.private.signingKey,
       );
@@ -444,8 +446,9 @@ export function useTaskBoard() {
       setFeedback('Proving, balancing, and submitting your updated task list with 1AM...');
 
       const payloadForChain = await maybeEncryptPayload(nextPayload, session, contractAddress);
+      const providers = session.providersByMode[privacyMode];
 
-      const callTxData = await createUnprovenCallTx(session.providers, {
+      const callTxData = await createUnprovenCallTx(providers, {
         compiledContract: isShieldedMode ? compiledShieldedTodoContract : compiledTodoContract,
         contractAddress,
         circuitId: 'storeTodo',
@@ -456,7 +459,7 @@ export function useTaskBoard() {
         payloadEncrypted: confidentialMode,
       });
 
-      const txId = await submitTxAsync(session.providers, {
+      const txId = await submitTxAsync(providers, {
         unprovenTx: callTxData.private.unprovenTx,
         circuitId: 'storeTodo',
       });

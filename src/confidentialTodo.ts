@@ -37,6 +37,19 @@ function fromBase64Url(value: string): Uint8Array {
   return out;
 }
 
+function fromHex(value: string): Uint8Array {
+  const normalized = value.startsWith('0x') ? value.slice(2) : value;
+  if (!normalized || normalized.length % 2 !== 0 || /[^0-9a-f]/i.test(normalized)) {
+    throw new Error('1AM returned an invalid signature for confidential key derivation.');
+  }
+
+  const out = new Uint8Array(normalized.length / 2);
+  for (let i = 0; i < normalized.length; i += 2) {
+    out[i / 2] = Number.parseInt(normalized.slice(i, i + 2), 16);
+  }
+  return out;
+}
+
 function makeSignatureMessage(networkId: string, contractAddress: string): string {
   return `1am-task-board-confidential-key|${networkId}|${contractAddress}`;
 }
@@ -48,9 +61,12 @@ async function deriveContractKey(context: ConfidentialContext): Promise<CryptoKe
 
   const signature = await context.api.signData(makeSignatureMessage(context.networkId, context.contractAddress), {
     encoding: 'text',
+    keyType: 'unshielded',
   });
 
-  const keyMaterial = await crypto.subtle.importKey('raw', textEncoder.encode(signature), 'HKDF', false, ['deriveKey']);
+  const keyMaterial = await crypto.subtle.importKey('raw', toArrayBuffer(fromHex(signature.signature)), 'HKDF', false, [
+    'deriveKey',
+  ]);
   return crypto.subtle.deriveKey(
     {
       name: 'HKDF',
