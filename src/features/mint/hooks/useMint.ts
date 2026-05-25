@@ -267,7 +267,7 @@ export function useMint() {
       setContractAddress(nextContractAddress);
       setContractSnapshot(null);
       setLedgerView(null);
-      setLastTxId(txId ?? '');
+      setLastTxId(txId);
       writeStoredContractAddress(nextContractAddress);
       setFeedback('Contract deployment submitted. Loading the indexed mint ledger...');
 

@@ -69,6 +69,15 @@ function summarizeHex(hex: string): string {
   return `${hex.slice(0, 16)}...${hex.slice(-16)}`;
 }
 
+function transactionIdentifier(tx: { identifiers(): string[] }): string {
+  const [identifier] = tx.identifiers();
+  if (!identifier) {
+    throw new Error('The finalized transaction did not contain a transaction identifier.');
+  }
+
+  return identifier;
+}
+
 function fromHex(hex: string): Uint8Array {
   const normalized = hex.startsWith('0x') ? hex.slice(2) : hex;
   if (normalized.length % 2 !== 0) {
@@ -420,7 +429,7 @@ export async function createConnectedSession(api: OneAmConnectedApi): Promise<Co
     zkConfigProvider as unknown as ZKConfigProvider<string>,
   );
 
-  const baseProvingProvider = await api.getProvingProvider(dedupSafeZkConfigProvider);
+  const baseProvingProvider = await api.getProvingProvider(dedupSafeZkConfigProvider.asKeyMaterialProvider());
   // Wrap so each prove/check call sends a unique keyLocation to the wallet.
   // The wallet's prove handler doesn't compare keyLocation against anything (it only
   // forwards bytes from keyMaterial to the proof server), so the nonce suffix is
@@ -464,15 +473,17 @@ export async function createConnectedSession(api: OneAmConnectedApi): Promise<Co
     submitTx: async (tx) => {
       try {
         const txHex = toHex(tx.serialize());
+        const txId = transactionIdentifier(tx);
         debugLog('midnightProvider', 'submitTx:start', {
+          txId,
           txHexLength: txHex.length,
           txHexPreview: summarizeHex(txHex),
           networkId: config.networkId,
           substrateNodeUri: config.substrateNodeUri,
         });
-        const txId = await api.submitTransaction(txHex);
+        await api.submitTransaction(txHex);
         debugLog('midnightProvider', 'submitTx:success', { txId });
-        return txId ?? '';
+        return txId;
       } catch (error) {
         debugError('midnightProvider', 'submitTx:error', {
           error,

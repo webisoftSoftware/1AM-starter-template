@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Copies Midnight system zk-keys (zswap + dust) into the dApp's public asset tree
-# so the in-browser FetchZkConfigProvider can serve them to the wallet's prover.
+# Optionally copies Midnight system zk-keys (zswap + dust) into the dApp's
+# public asset tree so FetchZkConfigProvider can serve them to the wallet's
+# prover. Normal dev/build uses the bundled files already tracked in public/.
 #
 # Source dir: $MIDNIGHT_SYSTEM_KEYS_DIR (must contain `zswap/` and optionally `dust/`)
 # Destination: public/zk/shieldedMint/{zkir,keys}/midnight/{zswap,dust}/

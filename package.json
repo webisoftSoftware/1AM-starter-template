@@ -5,11 +5,11 @@
   "type": "module",
   "scripts": {
     "compact:mint": "compact compile contracts/shieldedMint.compact contracts/managed/shieldedMint",
-    "sync:mint-assets": "mkdir -p public/zk/shieldedMint && rm -rf public/zk/shieldedMint/keys public/zk/shieldedMint/zkir && cp -r contracts/managed/shieldedMint/keys public/zk/shieldedMint/ && cp -r contracts/managed/shieldedMint/zkir public/zk/shieldedMint/",
+    "sync:mint-assets": "mkdir -p public/zk/shieldedMint/keys public/zk/shieldedMint/zkir && cp contracts/managed/shieldedMint/keys/mintShielded.* public/zk/shieldedMint/keys/ && cp contracts/managed/shieldedMint/zkir/mintShielded.* public/zk/shieldedMint/zkir/",
     "sync:system-keys": "bash scripts/sync-system-keys.sh",
-    "prepare:mint": "npm run compact:mint && npm run sync:mint-assets && npm run sync:system-keys",
-    "predev": "npm run sync:mint-assets && npm run sync:system-keys",
-    "prebuild": "npm run sync:mint-assets && npm run sync:system-keys",
+    "prepare:mint": "npm run compact:mint && npm run sync:mint-assets",
+    "predev": "npm run sync:mint-assets",
+    "prebuild": "npm run sync:mint-assets",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview"
