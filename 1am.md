@@ -27,7 +27,7 @@ type TransferRequest = {
   value: bigint;
 };
 
-type MakeTransferResult = { tx_id: string } | { tx: string };
+type MakeTransferResult = { tx_id: string };
 ```
 
 Important method details:
@@ -35,7 +35,6 @@ Important method details:
 - `getConfiguration()` returns `{ networkId, indexerUri, indexerWsUri, proverServerUri?, substrateNodeUri }`.
 - `getUnshieldedAddress()` returns `{ unshieldedAddress }`.
 - `makeTransfer(transfers)` requests wallet approval for one or more transfers.
-- `submitTransaction(txHex)` returns `Promise<void>` and is used only when `makeTransfer(...)` returns a finalized transaction hex.
 - `signData(data, { encoding, keyType: 'unshielded' })` returns `{ data, signature, verifyingKey }`.
 
 ## Native NIGHT Transfer Flow
@@ -58,12 +57,7 @@ await api.makeTransfer([
 ]);
 ```
 
-Current `one-am-wallet` behavior submits internally and returns `{ tx_id }`. If a future connector returns `{ tx }`, derive the transaction id from the finalized transaction before submitting it:
-
-```ts
-const txId = Transaction.deserialize('signature', 'proof', 'binding', fromHex(tx)).identifiers()[0];
-await api.submitTransaction(tx);
-```
+`one-am-wallet` submits internally and returns `{ tx_id }`.
 
 ## Validation
 
@@ -78,8 +72,6 @@ Recipient address and network validation are delegated to 1AM so wallet-reported
 
 ## Common Mistakes
 
-- Treating `makeTransfer(...)` as if it always returns the same shape.
-- Calling `submitTransaction(...)` after `makeTransfer(...)` has already returned `{ tx_id }`.
 - Comparing the user amount before converting it to native NIGHT atomic units.
 - Using a hard-coded token type instead of `nativeToken().raw`.
 - Omitting `keyType: 'unshielded'` when using `signData(...)`.

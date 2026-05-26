@@ -25,13 +25,12 @@ declare global {
     value: bigint;
   }
 
-  type OneAmMakeTransferResult = { tx_id: string } | { tx: string };
+  type OneAmMakeTransferResult = { tx_id: string };
 
   interface OneAmConnectedApi {
     getConfiguration: () => Promise<OneAmConfiguration>;
     getUnshieldedAddress: () => Promise<{ unshieldedAddress: string }>;
     makeTransfer: (transfers: OneAmTransferRequest[]) => Promise<OneAmMakeTransferResult>;
-    submitTransaction: (txHex: string) => Promise<void>;
     signData: (data: string, options: OneAmSignDataOptions) => Promise<OneAmSignature>;
   }
 

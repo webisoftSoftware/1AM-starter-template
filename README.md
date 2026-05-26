@@ -38,8 +38,7 @@ Important API details:
 - `api.getConfiguration()` is the source of truth for network and node details.
 - `api.getUnshieldedAddress()` returns the wallet address used as the sender.
 - `api.makeTransfer([{ kind: 'unshielded', recipient, type: nativeToken().raw, value }])` requests a native NIGHT transfer.
-- Current `one-am-wallet` submits inside `makeTransfer(...)` and returns `{ tx_id }`.
-- If a future connector returns `{ tx }`, the app derives the transaction id from the finalized transaction and then calls `api.submitTransaction(tx)`.
+- `one-am-wallet` submits inside `makeTransfer(...)` and returns `{ tx_id }`.
 
 User-entered NIGHT amounts support up to 6 decimal places. Address and network validation are delegated to 1AM.
 
