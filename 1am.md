@@ -13,11 +13,11 @@ const api = await wallet.connect('preview'); // or 'preprod'
 
 Detection can be delayed while the extension injects the provider, so the app polls briefly before showing the not-found state.
 
-After connecting, call `api.getConfiguration()` and use the returned wallet configuration. Do not hard-code network or node endpoints in the dApp.
+After connecting, call `api.getConfiguration()` and use the returned wallet network id for display.
 
 ## Connector API Shape
 
-The local `src/1am.d.ts` file should match the connector shape used by this app:
+The local `src/1am.d.ts` file should type only the connector shape used by this app:
 
 ```ts
 type TransferRequest = {
@@ -32,10 +32,9 @@ type MakeTransferResult = { tx_id: string };
 
 Important method details:
 
-- `getConfiguration()` returns `{ networkId, indexerUri, indexerWsUri, proverServerUri?, substrateNodeUri }`.
+- `getConfiguration()` returns the wallet-reported network id.
 - `getUnshieldedAddress()` returns `{ unshieldedAddress }`.
 - `makeTransfer(transfers)` requests wallet approval for one or more transfers.
-- `signData(data, { encoding, keyType: 'unshielded' })` returns `{ data, signature, verifyingKey }`.
 
 ## Native NIGHT Transfer Flow
 
@@ -74,4 +73,3 @@ Recipient address and network validation are delegated to 1AM so wallet-reported
 
 - Comparing the user amount before converting it to native NIGHT atomic units.
 - Using a hard-coded token type instead of `nativeToken().raw`.
-- Omitting `keyType: 'unshielded'` when using `signData(...)`.

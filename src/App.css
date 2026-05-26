@@ -225,23 +225,6 @@ h2 {
   padding-right: 0.2rem;
 }
 
-.actions-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.9rem;
-  flex-wrap: wrap;
-}
-
-.actions {
-  display: grid;
-  gap: 0.7rem;
-}
-
-.actions-single {
-  grid-template-columns: minmax(160px, 220px);
-}
-
 .stack {
   display: grid;
   gap: 0.9rem;
@@ -262,9 +245,7 @@ h2 {
   text-transform: uppercase;
 }
 
-input,
-textarea,
-select {
+input {
   width: 100%;
   border: 1px solid var(--gray-300);
   border-radius: 4px;
@@ -275,23 +256,18 @@ select {
   transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
 }
 
-input:hover,
-textarea:hover,
-select:hover {
+input:hover {
   border-color: var(--gray-400);
 }
 
-input:focus,
-textarea:focus,
-select:focus {
+input:focus {
   border-color: var(--gray-500);
   box-shadow: 0 0 0 3px rgba(65, 70, 81, 0.16);
   outline: none;
 }
 
 input[readonly],
-textarea:disabled,
-select:disabled,
+input:disabled,
 button:disabled {
   background: var(--gray-100);
 }
@@ -338,12 +314,6 @@ button:disabled {
 
 .button-primary:active:enabled {
   background: #111827;
-}
-
-.button-secondary {
-  border-color: var(--gray-300);
-  background: var(--gray-25);
-  color: var(--gray-700);
 }
 
 .details {
@@ -515,7 +485,6 @@ dd {
   .tabs,
   .summary-grid,
   .task-form-grid,
-  .actions-single,
   .task-actions,
   .composer-header,
   .debug-header {
@@ -528,9 +497,7 @@ dd {
   }
 
   button,
-  input,
-  textarea,
-  select {
+  input {
     width: 100%;
   }
 }

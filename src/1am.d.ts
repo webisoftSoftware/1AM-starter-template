@@ -1,21 +1,6 @@
 declare global {
   interface OneAmConfiguration {
     networkId: string;
-    indexerUri: string;
-    indexerWsUri: string;
-    proverServerUri?: string;
-    substrateNodeUri: string;
-  }
-
-  interface OneAmSignDataOptions {
-    encoding: 'hex' | 'base64' | 'text';
-    keyType: 'unshielded';
-  }
-
-  interface OneAmSignature {
-    data: string;
-    signature: string;
-    verifyingKey: string;
   }
 
   interface OneAmTransferRequest {
@@ -31,7 +16,6 @@ declare global {
     getConfiguration: () => Promise<OneAmConfiguration>;
     getUnshieldedAddress: () => Promise<{ unshieldedAddress: string }>;
     makeTransfer: (transfers: OneAmTransferRequest[]) => Promise<OneAmMakeTransferResult>;
-    signData: (data: string, options: OneAmSignDataOptions) => Promise<OneAmSignature>;
   }
 
   interface OneAmWallet {

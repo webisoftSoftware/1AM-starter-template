@@ -5,7 +5,7 @@ This repository is a minimal React + TypeScript + Vite example that connects to 
 ## What It Does
 
 - Detects and connects `window.midnight['1am']`
-- Reads network and node configuration from the connected wallet
+- Reads the connected network from the wallet
 - Shows the connected unshielded address
 - Sends unshielded native NIGHT with `api.makeTransfer(...)`
 - Exposes a debug tab with connector and transfer logs
@@ -35,7 +35,7 @@ The dApp uses the injected connector at `window.midnight['1am']`.
 Important API details:
 
 - `wallet.connect('preview' | 'preprod')` returns the connected 1AM API.
-- `api.getConfiguration()` is the source of truth for network and node details.
+- `api.getConfiguration()` reports the connected wallet network.
 - `api.getUnshieldedAddress()` returns the wallet address used as the sender.
 - `api.makeTransfer([{ kind: 'unshielded', recipient, type: nativeToken().raw, value }])` requests a native NIGHT transfer.
 - `one-am-wallet` submits inside `makeTransfer(...)` and returns `{ tx_id }`.
@@ -46,7 +46,7 @@ User-entered NIGHT amounts support up to 6 decimal places. Address and network v
 
 - `src/features/transfer/hooks/useTransfer.ts`: connection, validation, and transfer flow
 - `src/features/transfer/ui/*`: transfer screen and debug tab
-- `src/midnight.ts`: 1AM session helper, native token selection, and transfer submission handling
+- `src/oneAm.ts`: 1AM session helper, native token selection, and transfer submission handling
 - `src/1am.d.ts`: local connector types
 - `1am.md`: integration reference for using the 1AM connector
 

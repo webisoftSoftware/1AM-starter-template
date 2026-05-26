@@ -17,7 +17,7 @@ export function TransferTabPanel({ board }: TransferTabPanelProps) {
         <dl className="details summary-grid">
           <div>
             <dt>Network</dt>
-            <dd>{board.session.config.networkId}</dd>
+            <dd>{board.session.networkId}</dd>
           </div>
           <div>
             <dt>Unshielded address</dt>

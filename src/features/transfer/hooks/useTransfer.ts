@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { debugError, debugLog, subscribeDebugLogs, type DebugEntry } from '../../../debug';
 import {
-  createConnectedSession,
-  submitNativeNightTransfer,
+  connectOneAm,
+  getOneAmWallet,
+  sendNativeNightTransfer,
   type ConnectedSession,
-} from '../../../midnight';
+} from '../../../oneAm';
 import { APP_CONFIG } from '../../../config';
 import type { AppTab, BusyAction, WalletStatus } from '../types';
 
@@ -69,8 +70,7 @@ export function useTransfer() {
     const startedAt = Date.now();
 
     const checkWallet = () => {
-      const wallet = window.midnight?.['1am'];
-      if (wallet) {
+      if (getOneAmWallet()) {
         setWalletStatus('detected');
         return true;
       }
@@ -122,29 +122,26 @@ export function useTransfer() {
   const canSendTransfer = Boolean(session && busyAction === null);
 
   const connectWallet = async () => {
-    const wallet = window.midnight?.['1am'];
-    if (!wallet) {
+    if (!getOneAmWallet()) {
       setError('1AM wallet was not found in window.midnight["1am"].');
       return;
     }
 
     try {
-      debugLog('app', 'connectWallet:start');
+      debugLog('app', 'connect:start', { network: APP_CONFIG.oneAmNetwork });
       setBusyAction('connect');
       setError('');
       setFeedback(`Connecting to 1AM on ${APP_CONFIG.oneAmNetwork}...`);
 
-      const api = await wallet.connect(APP_CONFIG.oneAmNetwork);
-      debugLog('app', 'connectWallet:wallet-connected');
-      const connectedSession = await createConnectedSession(api);
-      debugLog('app', 'connectWallet:session-created', {
-        networkId: connectedSession.config.networkId,
+      const connectedSession = await connectOneAm(APP_CONFIG.oneAmNetwork);
+      debugLog('app', 'connect:success', {
+        networkId: connectedSession.networkId,
       });
 
       setSession(connectedSession);
       setFeedback('Wallet connected. Enter a recipient and amount to send NIGHT.');
     } catch (connectError) {
-      debugError('app', 'connectWallet:error', connectError);
+      debugError('app', 'connect:error', connectError);
       setError(connectError instanceof Error ? connectError.message : 'Connection failed.');
     } finally {
       setBusyAction(null);
@@ -164,7 +161,7 @@ export function useTransfer() {
 
     try {
       const trimmedRecipient = recipient.trim();
-      debugLog('app', 'sendTransfer:start', {
+      debugLog('app', 'transfer:start', {
         recipient: trimmedRecipient,
         amount,
         value: parsedAmount.atomicValue.toString(),
@@ -173,12 +170,12 @@ export function useTransfer() {
       setError('');
       setFeedback('Requesting transfer approval in 1AM...');
 
-      const txId = await submitNativeNightTransfer(session.api, trimmedRecipient, parsedAmount.atomicValue);
+      const txId = await sendNativeNightTransfer(session.api, trimmedRecipient, parsedAmount.atomicValue);
       setLastTxId(txId);
       setFeedback('Transfer submitted.');
-      debugLog('app', 'sendTransfer:submitted', { txId });
+      debugLog('app', 'transfer:success', { txId });
     } catch (transferError) {
-      debugError('app', 'sendTransfer:error', transferError);
+      debugError('app', 'transfer:error', transferError);
       setError(transferError instanceof Error ? transferError.message : 'Transfer submission failed.');
     } finally {
       setBusyAction(null);
