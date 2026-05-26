@@ -5,7 +5,6 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_1AM_NETWORK: ${VITE_1AM_NETWORK:-preview}
-        VITE_ZK_MINT_ASSET_BASE_PATH: ${VITE_ZK_MINT_ASSET_BASE_PATH:-/zk/shieldedMint}
     container_name: dapp-example
     ports:
       - "5173:5173"

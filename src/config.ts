@@ -8,15 +8,6 @@ function readOneAmNetwork(value: string | undefined): OneAmNetwork {
   return 'preview';
 }
 
-function readNonEmpty(value: string | undefined, fallback: string): string {
-  if (typeof value === 'string' && value.trim()) {
-    return value.trim();
-  }
-
-  return fallback;
-}
-
 export const APP_CONFIG = {
   oneAmNetwork: readOneAmNetwork(import.meta.env.VITE_1AM_NETWORK),
-  zkMintAssetBasePath: readNonEmpty(import.meta.env.VITE_ZK_MINT_ASSET_BASE_PATH, '/zk/shieldedMint'),
 } as const;

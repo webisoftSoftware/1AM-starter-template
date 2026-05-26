@@ -4,28 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "compact:mint": "compact compile contracts/shieldedMint.compact contracts/managed/shieldedMint",
-    "sync:mint-assets": "mkdir -p public/zk/shieldedMint/keys public/zk/shieldedMint/zkir && cp contracts/managed/shieldedMint/keys/mintShielded.* public/zk/shieldedMint/keys/ && cp contracts/managed/shieldedMint/zkir/mintShielded.* public/zk/shieldedMint/zkir/",
-    "sync:system-keys": "bash scripts/sync-system-keys.sh",
-    "prepare:mint": "npm run compact:mint && npm run sync:mint-assets",
-    "predev": "npm run sync:mint-assets",
-    "prebuild": "npm run sync:mint-assets",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
-    "@midnight-ntwrk/compact-runtime": "^0.16.0",
-    "@midnight-ntwrk/ledger": "^4.0.0",
     "@midnight-ntwrk/ledger-v8": "^8.0.3",
-    "@midnight-ntwrk/midnight-js-contracts": "^4.0.4",
-    "@midnight-ntwrk/midnight-js-fetch-zk-config-provider": "^4.0.4",
-    "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "^4.0.4",
-    "@midnight-ntwrk/midnight-js-network-id": "^4.0.4",
-    "@midnight-ntwrk/midnight-js-testing": "^2.0.2",
-    "@midnight-ntwrk/midnight-js-types": "^4.0.4",
-    "@midnight-ntwrk/wallet-sdk-address-format": "^3.1.0",
-    "buffer": "^6.0.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

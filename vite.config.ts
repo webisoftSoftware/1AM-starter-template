@@ -14,20 +14,12 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), wasm(), topLevelAwait()],
     resolve: {
       dedupe: [
-        '@midnight-ntwrk/compact-js',
-        '@midnight-ntwrk/compact-runtime',
         '@midnight-ntwrk/ledger-v8',
-        '@midnight-ntwrk/onchain-runtime-v3',
       ],
     },
     optimizeDeps: {
       include: [
-        '@midnight-ntwrk/compact-js',
-        '@midnight-ntwrk/compact-runtime',
         '@midnight-ntwrk/ledger-v8',
-        '@midnight-ntwrk/onchain-runtime-v3',
-        '@midnight-ntwrk/midnight-js-contracts',
-        '@midnight-ntwrk/midnight-js-types',
       ],
     },
     server: {

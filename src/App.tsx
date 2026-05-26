@@ -1,7 +1,7 @@
-import MintPage from './features/mint/ui/MintPage';
+import TransferPage from './features/transfer/ui/TransferPage';
 
 function App() {
-  return <MintPage />;
+  return <TransferPage />;
 }
 
 export default App;
