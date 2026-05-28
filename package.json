@@ -6,11 +6,16 @@
   "scripts": {
     "compact:todo": "compact compile contracts/todo.compact contracts/managed/todo",
     "compact:shielded-todo": "compact compile contracts/shieldedTodo.compact contracts/managed/shieldedTodo",
+    "compact:mint": "compact compile contracts/shieldedMint.compact contracts/managed/shieldedMint",
     "sync:todo-assets": "mkdir -p public/zk/todo && rm -rf public/zk/todo/keys public/zk/todo/zkir && cp -r contracts/managed/todo/keys public/zk/todo/ && cp -r contracts/managed/todo/zkir public/zk/todo/",
     "sync:shielded-todo-assets": "mkdir -p public/zk/shieldedTodo && rm -rf public/zk/shieldedTodo/keys public/zk/shieldedTodo/zkir && cp -r contracts/managed/shieldedTodo/keys public/zk/shieldedTodo/ && cp -r contracts/managed/shieldedTodo/zkir public/zk/shieldedTodo/",
+    "sync:mint-assets": "mkdir -p public/zk/shieldedMint/keys public/zk/shieldedMint/zkir && cp contracts/managed/shieldedMint/keys/mintShielded.* public/zk/shieldedMint/keys/ && cp contracts/managed/shieldedMint/zkir/mintShielded.* public/zk/shieldedMint/zkir/",
+    "sync:system-keys": "bash scripts/sync-system-keys.sh",
     "prepare:todo": "npm run compact:todo && npm run compact:shielded-todo && npm run sync:todo-assets && npm run sync:shielded-todo-assets",
-    "predev": "npm run sync:todo-assets && npm run sync:shielded-todo-assets",
-    "prebuild": "npm run sync:todo-assets && npm run sync:shielded-todo-assets",
+    "prepare:mint": "npm run compact:mint && npm run sync:mint-assets",
+    "prepare:contracts": "npm run prepare:todo && npm run prepare:mint",
+    "predev": "npm run sync:todo-assets && npm run sync:shielded-todo-assets && npm run sync:mint-assets",
+    "prebuild": "npm run sync:todo-assets && npm run sync:shielded-todo-assets && npm run sync:mint-assets",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview"

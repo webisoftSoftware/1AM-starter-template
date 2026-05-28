@@ -7,7 +7,8 @@ import {
 } from '@midnight-ntwrk/midnight-js-contracts';
 import { ChargedState, ContractState as CompactContractState, sampleSigningKey } from '@midnight-ntwrk/compact-runtime';
 import { debugError, debugLog, subscribeDebugLogs, type DebugEntry } from '../../../debug';
-import { createConnectedSession, type ConnectedSession } from '../../../midnight';
+import { createTodoProviders, type TodoProvidersByMode } from '../../../midnight';
+import type { OneAmSession } from '../../../oneAm';
 import { decryptTodoPayload, encryptTodoPayload, isEncryptedTodoPayload } from '../../../confidentialTodo';
 import { compiledTodoContract, todoLedger } from '../../../todoContract';
 import { compiledShieldedTodoContract } from '../../../shieldedTodoContract';
@@ -33,18 +34,25 @@ import type {
   WalletStatus,
 } from '../types';
 
-const DETECT_TIMEOUT_MS = 6000;
-const DETECT_INTERVAL_MS = 300;
+type TaskContractSession = OneAmSession & {
+  providersByMode: TodoProvidersByMode;
+};
+
+type UseTaskBoardOptions = {
+  oneAmSession: OneAmSession | null;
+  walletStatus: WalletStatus;
+  statusText: string;
+  connectWallet: () => void;
+};
 
 function isMissingPublicStateError(error: unknown): boolean {
   return error instanceof Error && error.message.includes('No public state found at contract address');
 }
 
-export function useTaskBoard() {
+export function useTaskBoard({ oneAmSession, walletStatus, statusText, connectWallet }: UseTaskBoardOptions) {
   const [privacyMode, setPrivacyMode] = useState<PrivacyMode>('unshielded');
   const [confidentialMode, setConfidentialMode] = useState(false);
-  const [walletStatus, setWalletStatus] = useState<WalletStatus>('checking');
-  const [session, setSession] = useState<ConnectedSession | null>(null);
+  const [session, setSession] = useState<TaskContractSession | null>(null);
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [contractAddress, setContractAddress] = useState(() => readStoredContractAddress(PUBLIC_CONTRACT_ADDRESS_STORAGE_KEY));
   const [contractSnapshot, setContractSnapshot] = useState<ContractSnapshot | null>(null);
@@ -70,46 +78,55 @@ export function useTaskBoard() {
   }, []);
 
   useEffect(() => {
-    const startedAt = Date.now();
+    let cancelled = false;
 
-    const checkWallet = () => {
-      const wallet = window.midnight?.['1am'];
-      if (wallet) {
-        setWalletStatus('detected');
-        return true;
-      }
-
-      if (Date.now() - startedAt >= DETECT_TIMEOUT_MS) {
-        setWalletStatus('not-found');
-        return true;
-      }
-
-      return false;
-    };
-
-    if (checkWallet()) {
+    if (!oneAmSession) {
+      setSession(null);
+      setFeedback('Connect 1AM to deploy the contract and manage your tasks.');
       return;
     }
 
-    const intervalId = window.setInterval(() => {
-      if (checkWallet()) {
-        window.clearInterval(intervalId);
+    const initializeProviders = async () => {
+      try {
+        debugLog('tasks', 'providers:init:start');
+        setBusyAction('connect');
+        setError('');
+        setFeedback('Preparing task contract providers...');
+        const providersByMode = await createTodoProviders(oneAmSession);
+        if (cancelled) {
+          return;
+        }
+
+        const nextSession = { ...oneAmSession, providersByMode };
+        setSession(nextSession);
+        setFeedback('Wallet connected. Deploy the task contract once, then manage your task list.');
+
+        if (contractAddress) {
+          await refreshTasks(nextSession, contractAddress, false);
+        }
+      } catch (providerError) {
+        debugError('tasks', 'providers:init:error', providerError);
+        if (!cancelled) {
+          setSession(null);
+          setError(providerError instanceof Error ? providerError.message : 'Unable to initialize task providers.');
+        }
+      } finally {
+        if (!cancelled) {
+          setBusyAction(null);
+        }
       }
-    }, DETECT_INTERVAL_MS);
+    };
+
+    void initializeProviders();
 
     return () => {
-      window.clearInterval(intervalId);
+      cancelled = true;
     };
-  }, []);
+  }, [oneAmSession]);
 
   const isConnected = session !== null;
   const isShieldedMode = privacyMode === 'shielded';
   const activeStorageKey = isShieldedMode ? SHIELDED_CONTRACT_ADDRESS_STORAGE_KEY : PUBLIC_CONTRACT_ADDRESS_STORAGE_KEY;
-
-  const statusText = useMemo(() => {
-    if (walletStatus === 'checking') return 'Checking for 1AM';
-    return '1AM not found';
-  }, [walletStatus]);
 
   const categories = useMemo(
     () => Array.from(new Set(tasks.map((task) => task.category).filter((category): category is string => Boolean(category)))).sort(),
@@ -172,7 +189,7 @@ export function useTaskBoard() {
 
   const maybeEncryptPayload = async (
     payloadValue: string,
-    activeSession: ConnectedSession,
+    activeSession: TaskContractSession,
     activeContractAddress: string,
   ): Promise<string> => {
     if (!confidentialMode) {
@@ -188,7 +205,7 @@ export function useTaskBoard() {
 
   const maybeDecryptPayload = async (
     payloadValue: string,
-    activeSession: ConnectedSession,
+    activeSession: TaskContractSession,
     activeContractAddress: string,
   ): Promise<string> => {
     if (!isEncryptedTodoPayload(payloadValue)) {
@@ -219,7 +236,7 @@ export function useTaskBoard() {
   }, [activeStorageKey, isShieldedMode]);
 
   const refreshTasks = async (
-    activeSession: ConnectedSession,
+    activeSession: TaskContractSession,
     activeContractAddress: string,
     showBusyState = true,
   ) => {
@@ -286,7 +303,7 @@ export function useTaskBoard() {
     }
   };
 
-  const waitForContractSnapshot = async (activeSession: ConnectedSession, activeContractAddress: string) => {
+  const waitForContractSnapshot = async (activeSession: TaskContractSession, activeContractAddress: string) => {
     for (let attempt = 1; attempt <= 10; attempt += 1) {
       debugLog('app', 'waitForContractSnapshot:attempt', { activeContractAddress, attempt });
 
@@ -298,41 +315,6 @@ export function useTaskBoard() {
     }
 
     return false;
-  };
-
-  const connectWallet = async () => {
-    const wallet = window.midnight?.['1am'];
-    if (!wallet) {
-      setError('1AM wallet was not found in window.midnight["1am"].');
-      return;
-    }
-
-    try {
-      debugLog('app', 'connectWallet:start');
-      setBusyAction('connect');
-      setError('');
-      setFeedback(`Connecting to 1AM on ${APP_CONFIG.oneAmNetwork}...`);
-
-      const api = await wallet.connect(APP_CONFIG.oneAmNetwork);
-      debugLog('app', 'connectWallet:wallet-connected');
-      const connectedSession = await createConnectedSession(api);
-      debugLog('app', 'connectWallet:session-created', {
-        networkId: connectedSession.config.networkId,
-        indexerUri: connectedSession.config.indexerUri,
-      });
-
-      setSession(connectedSession);
-      setFeedback('Wallet connected. Deploy the task contract once, then manage your task list.');
-
-      if (contractAddress) {
-        await refreshTasks(connectedSession, contractAddress, false);
-      }
-    } catch (connectError) {
-      debugError('app', 'connectWallet:error', connectError);
-      setError(connectError instanceof Error ? connectError.message : 'Connection failed.');
-    } finally {
-      setBusyAction(null);
-    }
   };
 
   const deployTaskContract = async () => {

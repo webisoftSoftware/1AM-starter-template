@@ -62,6 +62,10 @@ body {
   min-height: calc(100dvh - 4rem);
 }
 
+.workspace-panel {
+  width: min(1280px, 100%);
+}
+
 .panel-top {
   display: flex;
   align-items: flex-start;
@@ -69,6 +73,67 @@ body {
   gap: 1rem;
   border-bottom: 1px solid var(--gray-300);
   padding-bottom: 1.1rem;
+}
+
+.workspace-header {
+  align-items: stretch;
+}
+
+.workspace-session {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.workspace-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  border-bottom: 1px solid var(--gray-300);
+  padding-bottom: 0.75rem;
+}
+
+.workspace-tab {
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--gray-600);
+  font-family: var(--font-mono);
+  font-size: 0.69rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.11em;
+  padding: 0.75rem 0.7rem;
+  text-transform: uppercase;
+}
+
+.workspace-tab:hover {
+  background: var(--gray-100);
+  border-color: var(--gray-200);
+}
+
+.workspace-tab-active {
+  color: var(--gray-800);
+  border-color: var(--gray-300);
+  background: var(--gray-100);
+}
+
+.workspace-content {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace-dapp {
+  min-height: 0;
+  flex: 1;
+}
+
+.dapp-panel {
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .brand-intro {
@@ -735,6 +800,7 @@ dd {
   }
 
   .summary-grid,
+  .workspace-session,
   .task-form-grid,
   .filter-grid {
     grid-template-columns: 1fr;
@@ -767,6 +833,10 @@ dd {
   .tabs {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .workspace-tabs {
+    grid-template-columns: 1fr;
   }
 
   .contract-address-row {
