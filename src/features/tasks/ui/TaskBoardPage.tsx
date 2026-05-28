@@ -2,26 +2,31 @@ import { useTaskBoard } from '../hooks/useTaskBoard';
 import { AddTabPanel } from './components/AddTabPanel';
 import { DebugTabPanel } from './components/DebugTabPanel';
 import { ListTabPanel } from './components/ListTabPanel';
-import { TaskBoardHeader } from './components/TaskBoardHeader';
 import { TaskBoardTabs } from './components/TaskBoardTabs';
+import type { OneAmSession } from '../../../oneAm';
+import type { WalletStatus } from '../types';
 
-export default function TaskBoardPage() {
-  const board = useTaskBoard();
+type TaskBoardPageProps = {
+  oneAmSession: OneAmSession | null;
+  walletStatus: WalletStatus;
+  statusText: string;
+  connectWallet: () => void;
+};
+
+export default function TaskBoardPage(props: TaskBoardPageProps) {
+  const board = useTaskBoard(props);
 
   return (
-    <main className="page">
-      <section className="panel">
-        <TaskBoardHeader board={board} />
-        <TaskBoardTabs board={board} />
+    <section className="dapp-panel" aria-label="Task Board">
+      <TaskBoardTabs board={board} />
 
-        <section className="tab-content">
-          {board.activeTab === 'add' && <AddTabPanel board={board} />}
-          {board.activeTab === 'list' && <ListTabPanel board={board} />}
-          {board.activeTab === 'debug' && <DebugTabPanel board={board} />}
-        </section>
-
-        {board.error && <p className="error">{board.error}</p>}
+      <section className="tab-content">
+        {board.activeTab === 'add' && <AddTabPanel board={board} />}
+        {board.activeTab === 'list' && <ListTabPanel board={board} />}
+        {board.activeTab === 'debug' && <DebugTabPanel board={board} />}
       </section>
-    </main>
+
+      {board.error && <p className="error">{board.error}</p>}
+    </section>
   );
 }

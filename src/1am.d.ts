@@ -18,6 +18,15 @@ declare global {
     substrateNodeUri: string;
   }
 
+  interface OneAmTransferRequest {
+    kind: 'unshielded';
+    recipient: string;
+    type: import('@midnight-ntwrk/ledger-v8').RawTokenType;
+    value: bigint;
+  }
+
+  type OneAmMakeTransferResult = { tx_id: string };
+
   interface OneAmConnectedApi {
     getConfiguration: () => Promise<OneAmConfiguration>;
     getShieldedAddresses: () => Promise<{
@@ -32,6 +41,7 @@ declare global {
     signData: (data: string, options: OneAmSignDataOptions) => Promise<OneAmSignature>;
     balanceUnsealedTransaction: (txHex: string) => Promise<{ tx: string }>;
     submitTransaction: (txHex: string) => Promise<void>;
+    makeTransfer: (transfers: OneAmTransferRequest[]) => Promise<OneAmMakeTransferResult>;
   }
 
   interface OneAmWallet {

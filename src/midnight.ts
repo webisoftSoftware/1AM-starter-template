@@ -1,5 +1,11 @@
 import { ContractState } from '@midnight-ntwrk/compact-runtime';
-import { LedgerParameters, Transaction, ZswapChainState, type TransactionId } from '@midnight-ntwrk/ledger-v8';
+import {
+  LedgerParameters,
+  type ProvingProvider,
+  Transaction,
+  ZswapChainState,
+  type TransactionId,
+} from '@midnight-ntwrk/ledger-v8';
 import { FetchZkConfigProvider } from '@midnight-ntwrk/midnight-js-fetch-zk-config-provider';
 import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
@@ -15,14 +21,18 @@ import {
   type UnboundTransaction,
   type UnshieldedBalances,
   type WalletProvider,
+  ZKConfigProvider,
 } from '@midnight-ntwrk/midnight-js-types';
 import { debugError, debugLog } from './debug';
 import { APP_CONFIG } from './config';
+import type { OneAmSession } from './oneAm';
 
-type TodoProviders = ContractProviders<any, 'storeTodo', undefined>;
+export type TodoProviders = ContractProviders<any, 'storeTodo', undefined>;
+export type MintProviders = ContractProviders<any, 'mintShielded', undefined>;
+export type TodoContractMode = 'unshielded' | 'shielded';
+export type TodoProvidersByMode = Record<TodoContractMode, TodoProviders>;
 
 type BrowserPrivateStateProvider = PrivateStateProvider<PrivateStateId, undefined>;
-type TodoContractMode = 'unshielded' | 'shielded';
 
 type GraphQlResponse<T> = {
   data?: T;
@@ -41,14 +51,6 @@ type LatestContractAction = {
   deploy?: {
     unshieldedBalances: Array<{ tokenType: string; amount: string }>;
   };
-};
-
-export type ConnectedSession = {
-  api: OneAmConnectedApi;
-  config: OneAmConfiguration;
-  providers: TodoProviders;
-  providersByMode: Record<TodoContractMode, TodoProviders>;
-  unshieldedAddress: string;
 };
 
 const ZK_ASSET_BASE_PATH_BY_MODE: Record<TodoContractMode, string> = {
@@ -84,7 +86,11 @@ function fromHex(hex: string): Uint8Array {
 function transactionIdentifier(tx: { identifiers(): Iterable<unknown> }): TransactionId {
   const identifiers = Array.from(tx.identifiers());
   const identifier = identifiers[identifiers.length - 1];
-  return (identifier instanceof Uint8Array ? toHex(identifier) : String(identifier ?? '')) as TransactionId;
+  if (!identifier) {
+    throw new Error('The finalized transaction did not contain a transaction identifier.');
+  }
+
+  return (identifier instanceof Uint8Array ? toHex(identifier) : String(identifier)) as TransactionId;
 }
 
 function toBigIntBalances(entries: Array<{ tokenType: string; amount: string }>): UnshieldedBalances {
@@ -126,10 +132,7 @@ async function queryLatestContractAction(
   return payload.data?.contractAction ?? null;
 }
 
-function createPatchedPublicDataProvider(
-  queryUrl: string,
-  subscriptionUrl: string,
-): PublicDataProvider {
+function createPatchedPublicDataProvider(queryUrl: string, subscriptionUrl: string): PublicDataProvider {
   const baseProvider = indexerPublicDataProvider(queryUrl, subscriptionUrl);
 
   return {
@@ -367,18 +370,8 @@ function createPrivateStateProvider(): BrowserPrivateStateProvider {
   };
 }
 
-export async function createConnectedSession(api: OneAmConnectedApi): Promise<ConnectedSession> {
-  const [config, unshieldedAddress, shieldedAddress] = await Promise.all([
-    api.getConfiguration(),
-    api.getUnshieldedAddress(),
-    api.getShieldedAddresses(),
-  ]);
-
-  setNetworkId(config.networkId);
-
-  const privateStateProvider = createPrivateStateProvider();
-
-  const walletProvider: WalletProvider = {
+function createWalletProvider(session: OneAmSession): WalletProvider {
+  return {
     balanceTx: async (tx: UnboundTransaction) => {
       try {
         const txHex = toHex(tx.serialize());
@@ -386,7 +379,7 @@ export async function createConnectedSession(api: OneAmConnectedApi): Promise<Co
           txHexLength: txHex.length,
           txHexPreview: summarizeHex(txHex),
         });
-        const balanced = await api.balanceUnsealedTransaction(txHex);
+        const balanced = await session.api.balanceUnsealedTransaction(txHex);
         debugLog('walletProvider', 'balanceTx:success', {
           balancedTxHexLength: balanced.tx.length,
           balancedTxHexPreview: summarizeHex(balanced.tx),
@@ -395,17 +388,19 @@ export async function createConnectedSession(api: OneAmConnectedApi): Promise<Co
       } catch (error) {
         debugError('walletProvider', 'balanceTx:error', {
           error,
-          networkId: config.networkId,
-          substrateNodeUri: config.substrateNodeUri,
+          networkId: session.config.networkId,
+          substrateNodeUri: session.config.substrateNodeUri,
         });
         throw error;
       }
     },
-    getCoinPublicKey: () => shieldedAddress.shieldedCoinPublicKey,
-    getEncryptionPublicKey: () => shieldedAddress.shieldedEncryptionPublicKey,
+    getCoinPublicKey: () => session.shieldedAddress.shieldedCoinPublicKey,
+    getEncryptionPublicKey: () => session.shieldedAddress.shieldedEncryptionPublicKey,
   };
+}
 
-  const midnightProvider: MidnightProvider = {
+function createMidnightProvider(session: OneAmSession): MidnightProvider {
+  return {
     submitTx: async (tx) => {
       try {
         const txHex = toHex(tx.serialize());
@@ -414,33 +409,42 @@ export async function createConnectedSession(api: OneAmConnectedApi): Promise<Co
           txHexLength: txHex.length,
           txHexPreview: summarizeHex(txHex),
           txId,
-          networkId: config.networkId,
-          substrateNodeUri: config.substrateNodeUri,
+          networkId: session.config.networkId,
+          substrateNodeUri: session.config.substrateNodeUri,
         });
-        await api.submitTransaction(txHex);
+        await session.api.submitTransaction(txHex);
         debugLog('midnightProvider', 'submitTx:success', { txId });
         return txId;
       } catch (error) {
         debugError('midnightProvider', 'submitTx:error', {
           error,
-          networkId: config.networkId,
-          substrateNodeUri: config.substrateNodeUri,
+          networkId: session.config.networkId,
+          substrateNodeUri: session.config.substrateNodeUri,
         });
         throw error;
       }
     },
   };
+}
+
+export async function createTodoProviders(session: OneAmSession): Promise<TodoProvidersByMode> {
+  setNetworkId(session.config.networkId);
+
+  const privateStateProvider = createPrivateStateProvider();
+  const walletProvider = createWalletProvider(session);
+  const midnightProvider = createMidnightProvider(session);
+  const publicDataProvider = createPatchedPublicDataProvider(session.config.indexerUri, session.config.indexerWsUri);
 
   const createModeProviders = async (mode: TodoContractMode): Promise<TodoProviders> => {
     const zkConfigProvider = new FetchZkConfigProvider<'storeTodo'>(
       new URL(ZK_ASSET_BASE_PATH_BY_MODE[mode], window.location.origin).toString(),
       window.fetch.bind(window),
     );
-    const provingProvider = await api.getProvingProvider(zkConfigProvider.asKeyMaterialProvider());
+    const provingProvider = await session.api.getProvingProvider(zkConfigProvider.asKeyMaterialProvider());
 
     return {
       privateStateProvider,
-      publicDataProvider: createPatchedPublicDataProvider(config.indexerUri, config.indexerWsUri),
+      publicDataProvider,
       zkConfigProvider,
       proofProvider: createProofProvider(provingProvider),
       walletProvider,
@@ -452,16 +456,83 @@ export async function createConnectedSession(api: OneAmConnectedApi): Promise<Co
     createModeProviders('unshielded'),
     createModeProviders('shielded'),
   ]);
-  const providersByMode = {
+
+  return {
     unshielded: unshieldedProviders,
     shielded: shieldedProviders,
   };
+}
+
+export async function createMintProviders(session: OneAmSession): Promise<MintProviders> {
+  setNetworkId(session.config.networkId);
+
+  const privateStateProvider = createPrivateStateProvider();
+  const walletProvider = createWalletProvider(session);
+  const midnightProvider = createMidnightProvider(session);
+  const publicDataProvider = createPatchedPublicDataProvider(session.config.indexerUri, session.config.indexerWsUri);
+
+  const nonceSeparator = '#nonce=';
+  const stripNonce = (keyLocation: string) => {
+    const index = keyLocation.indexOf(nonceSeparator);
+    return index === -1 ? keyLocation : keyLocation.slice(0, index);
+  };
+  const tagNonce = (keyLocation: string) => `${keyLocation}${nonceSeparator}${crypto.randomUUID()}`;
+
+  const zkBaseUrl = new URL(APP_CONFIG.zkMintAssetBasePath, window.location.origin).toString();
+  const loggingFetch: typeof window.fetch = async (input, init) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    debugLog('zkConfigProvider', 'fetch:start', { url });
+    const response = await window.fetch(input, init);
+    const contentType = response.headers.get('content-type') ?? '';
+    const contentLength = response.headers.get('content-length');
+    debugLog('zkConfigProvider', 'fetch:response', {
+      url,
+      status: response.status,
+      contentType,
+      contentLength,
+      ok: response.ok,
+      looksLikeHtml: contentType.includes('text/html'),
+    });
+    return response;
+  };
+  const zkConfigProvider = new FetchZkConfigProvider<'mintShielded'>(zkBaseUrl, loggingFetch);
+  debugLog('zkConfigProvider', 'baseURL', { zkBaseUrl });
+
+  class NonceStrippingZkConfigProvider extends ZKConfigProvider<string> {
+    constructor(private readonly inner: ZKConfigProvider<string>) {
+      super();
+    }
+
+    getProverKey(circuitId: string) {
+      return this.inner.getProverKey(stripNonce(circuitId));
+    }
+
+    getVerifierKey(circuitId: string) {
+      return this.inner.getVerifierKey(stripNonce(circuitId));
+    }
+
+    getZKIR(circuitId: string) {
+      return this.inner.getZKIR(stripNonce(circuitId));
+    }
+  }
+
+  const dedupSafeZkConfigProvider = new NonceStrippingZkConfigProvider(
+    zkConfigProvider as unknown as ZKConfigProvider<string>,
+  );
+  const baseProvingProvider = await session.api.getProvingProvider(dedupSafeZkConfigProvider.asKeyMaterialProvider());
+  const provingProvider: ProvingProvider = {
+    check: (serializedPreimage, keyLocation) =>
+      baseProvingProvider.check(serializedPreimage, tagNonce(keyLocation)),
+    prove: (serializedPreimage, keyLocation, overwriteBindingInput) =>
+      baseProvingProvider.prove(serializedPreimage, tagNonce(keyLocation), overwriteBindingInput),
+  };
 
   return {
-    api,
-    config,
-    providers: unshieldedProviders,
-    providersByMode,
-    unshieldedAddress: unshieldedAddress.unshieldedAddress,
+    privateStateProvider,
+    publicDataProvider,
+    zkConfigProvider,
+    proofProvider: createProofProvider(provingProvider),
+    walletProvider,
+    midnightProvider,
   };
 }
