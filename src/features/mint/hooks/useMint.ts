@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   createUnprovenCallTx,
   createUnprovenDeployTx,
@@ -8,7 +8,7 @@ import {
 import { sampleSigningKey } from '@midnight-ntwrk/compact-runtime';
 import { debugError, debugLog, subscribeDebugLogs, type DebugEntry } from '../../../debug';
 import { createMintProviders, type MintProviders } from '../../../midnight';
-import type { OneAmSession } from '../../../oneAm';
+import { getAvailableShieldedMintToken, type OneAmSession } from '../../../oneAm';
 import { compiledShieldedMintContract, mintLedger } from '../../../mintContract';
 import { APP_CONFIG } from '../../../config';
 import {
@@ -30,6 +30,8 @@ type UseMintOptions = {
   connectWallet: () => void;
 };
 
+type MintTokenBalanceStatus = 'idle' | 'loading' | 'loaded' | 'unavailable' | 'error';
+
 function isMissingPublicStateError(error: unknown): boolean {
   return error instanceof Error && error.message.includes('No public state found at contract address');
 }
@@ -49,6 +51,9 @@ export function useMint({ oneAmSession, walletStatus, statusText, connectWallet 
   const [amount, setAmount] = useState('100');
   const [activeTab, setActiveTab] = useState<AppTab>('mint');
   const [lastTxId, setLastTxId] = useState('');
+  const [availableMintTokenAtomic, setAvailableMintTokenAtomic] = useState<bigint | null>(null);
+  const [mintTokenBalanceStatus, setMintTokenBalanceStatus] = useState<MintTokenBalanceStatus>('idle');
+  const [mintTokenBalanceError, setMintTokenBalanceError] = useState('');
   const [feedback, setFeedback] = useState('Connect 1AM to deploy the mint contract and mint shielded tokens to your wallet.');
   const [error, setError] = useState('');
   const [debugEntries, setDebugEntries] = useState<DebugEntry[]>([]);
@@ -66,6 +71,9 @@ export function useMint({ oneAmSession, walletStatus, statusText, connectWallet 
 
     if (!oneAmSession) {
       setSession(null);
+      setAvailableMintTokenAtomic(null);
+      setMintTokenBalanceStatus('idle');
+      setMintTokenBalanceError('');
       setFeedback('Connect 1AM to deploy the mint contract and mint shielded tokens to your wallet.');
       return;
     }
@@ -110,6 +118,45 @@ export function useMint({ oneAmSession, walletStatus, statusText, connectWallet 
 
   const isConnected = session !== null;
 
+  const refreshMintTokenBalance = useCallback(async () => {
+    if (!session || !contractAddress) {
+      setAvailableMintTokenAtomic(null);
+      setMintTokenBalanceStatus('idle');
+      setMintTokenBalanceError('');
+      return;
+    }
+
+    try {
+      setMintTokenBalanceStatus('loading');
+      setMintTokenBalanceError('');
+      debugLog('app', 'mintTokenBalance:start', { contractAddress });
+      const balance = await getAvailableShieldedMintToken(session.api, contractAddress);
+      setAvailableMintTokenAtomic(balance);
+      setMintTokenBalanceStatus('loaded');
+      debugLog('app', 'mintTokenBalance:success', {
+        contractAddress,
+        atomicValue: balance.toString(),
+      });
+    } catch (balanceLookupError) {
+      debugError('app', 'mintTokenBalance:error', balanceLookupError);
+      setAvailableMintTokenAtomic(null);
+      setMintTokenBalanceStatus(
+        balanceLookupError instanceof Error && balanceLookupError.message.includes('does not expose')
+          ? 'unavailable'
+          : 'error',
+      );
+      setMintTokenBalanceError(
+        balanceLookupError instanceof Error
+          ? balanceLookupError.message
+          : 'Unable to load the shielded mint token balance.',
+      );
+    }
+  }, [contractAddress, session]);
+
+  useEffect(() => {
+    void refreshMintTokenBalance();
+  }, [refreshMintTokenBalance]);
+
   const parsedAmount = useMemo(() => {
     const trimmed = amount.trim();
     if (!trimmed) return null;
@@ -127,6 +174,11 @@ export function useMint({ oneAmSession, walletStatus, statusText, connectWallet 
   const canDeploy = Boolean(session && busyAction === null && !contractAddress);
   const canRefresh = Boolean(session && contractAddress && busyAction === null);
   const canMint = Boolean(session && contractAddress && contractSnapshot && busyAction === null && parsedAmount !== null);
+  const canRefreshMintTokenBalance = Boolean(
+    session && contractAddress && busyAction === null && mintTokenBalanceStatus !== 'loading',
+  );
+  const availableMintToken =
+    availableMintTokenAtomic === null ? null : `${availableMintTokenAtomic.toLocaleString('en-US')} tokens`;
 
   const clearContractState = (feedbackMessage: string) => {
     writeStoredContractAddress('');
@@ -134,6 +186,9 @@ export function useMint({ oneAmSession, walletStatus, statusText, connectWallet 
     setContractSnapshot(null);
     setLedgerView(null);
     setLastTxId('');
+    setAvailableMintTokenAtomic(null);
+    setMintTokenBalanceStatus('idle');
+    setMintTokenBalanceError('');
     setFeedback(feedbackMessage);
   };
 
@@ -323,6 +378,7 @@ export function useMint({ oneAmSession, walletStatus, statusText, connectWallet 
       debugLog('app', 'mint:submitted', { txId });
 
       setLastTxId(txId);
+      void refreshMintTokenBalance();
       setFeedback(`Mint submitted on-chain for ${parsedAmount.toString()} shielded tokens. Refresh to see the updated ledger.`);
     } catch (mintError) {
       debugError('app', 'mint:error', mintError);
@@ -363,16 +419,22 @@ export function useMint({ oneAmSession, walletStatus, statusText, connectWallet 
     activeTab,
     setActiveTab,
     lastTxId,
+    availableMintToken,
+    availableMintTokenAtomic,
+    mintTokenBalanceStatus,
+    mintTokenBalanceError,
     feedback,
     error,
     debugEntries,
     canDeploy,
     canRefresh,
     canMint,
+    canRefreshMintTokenBalance,
     connectWallet,
     deployMintContract,
     mint,
     refreshContractState,
+    refreshMintTokenBalance,
     clearSavedContract,
     clearDebugEntries,
     storageKey: MINT_CONTRACT_ADDRESS_STORAGE_KEY,

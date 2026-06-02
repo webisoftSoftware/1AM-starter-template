@@ -490,11 +490,41 @@ button:disabled {
   gap: 0.7rem;
 }
 
-.details div {
+.details > div {
   background: var(--gray-50);
   border: 1px solid var(--gray-300);
   border-radius: 4px;
   padding: 0.68rem 0.8rem;
+}
+
+.asset-balance-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.asset-balance-copy {
+  min-width: 0;
+}
+
+.asset-balance-value {
+  font-family: var(--font-mono);
+  font-size: 1.02rem;
+  font-weight: 600;
+}
+
+.asset-balance-refresh-button {
+  width: auto;
+  flex: 0 0 auto;
+  min-width: 6.4rem;
+  padding: 0.48rem 0.68rem;
+}
+
+.asset-balance-error {
+  margin: 0.32rem 0 0;
+  color: #932f2f;
+  font-size: 0.78rem;
 }
 
 .summary-grid,
@@ -848,6 +878,7 @@ dd {
   .inline-actions,
   .action-toggles,
   .task-actions,
+  .asset-balance-card,
   .composer-header,
   .task-list-header,
   .debug-header,

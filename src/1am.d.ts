@@ -42,6 +42,8 @@ declare global {
     balanceUnsealedTransaction: (txHex: string) => Promise<{ tx: string }>;
     submitTransaction: (txHex: string) => Promise<void>;
     makeTransfer: (transfers: OneAmTransferRequest[]) => Promise<OneAmMakeTransferResult>;
+    getUnshieldedBalances?: () => Promise<Record<import('@midnight-ntwrk/ledger-v8').RawTokenType, bigint>>;
+    getShieldedBalances?: () => Promise<Record<import('@midnight-ntwrk/ledger-v8').RawTokenType, bigint>>;
   }
 
   interface OneAmWallet {

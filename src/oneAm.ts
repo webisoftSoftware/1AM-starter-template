@@ -1,4 +1,4 @@
-import { nativeToken } from '@midnight-ntwrk/ledger-v8';
+import { nativeToken, rawTokenType, type ContractAddress } from '@midnight-ntwrk/ledger-v8';
 import type { OneAmNetwork } from './config';
 
 export type OneAmShieldedAddress = {
@@ -54,4 +54,40 @@ export async function sendNativeNightTransfer(
   ]);
 
   return result.tx_id;
+}
+
+export async function getAvailableNativeNight(api: OneAmConnectedApi): Promise<bigint> {
+  if (!api.getUnshieldedBalances) {
+    throw new Error('This 1AM connection does not expose unshielded balances.');
+  }
+
+  const balances = await api.getUnshieldedBalances();
+  return balances[nativeToken().raw] ?? 0n;
+}
+
+function paddedDomainSeparator(value: string): Uint8Array {
+  const encoded = new TextEncoder().encode(value);
+  if (encoded.length > 32) {
+    throw new Error('Token domain separators must fit in 32 bytes.');
+  }
+
+  const padded = new Uint8Array(32);
+  padded.set(encoded);
+  return padded;
+}
+
+export function shieldedMintTokenType(contractAddress: string): string {
+  return rawTokenType(paddedDomainSeparator('1am-shielded-mint'), contractAddress as ContractAddress);
+}
+
+export async function getAvailableShieldedMintToken(
+  api: OneAmConnectedApi,
+  contractAddress: string,
+): Promise<bigint> {
+  if (!api.getShieldedBalances) {
+    throw new Error('This 1AM connection does not expose shielded balances.');
+  }
+
+  const balances = await api.getShieldedBalances();
+  return balances[shieldedMintTokenType(contractAddress)] ?? 0n;
 }

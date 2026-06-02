@@ -11,6 +11,14 @@ function shorten(value: string, head = 14, tail = 8): string {
 }
 
 export function TransferTabPanel({ board }: TransferTabPanelProps) {
+  const balanceLabel =
+    board.availableNight ??
+    (board.balanceStatus === 'loading'
+      ? 'Loading...'
+      : board.balanceStatus === 'unavailable' || board.balanceStatus === 'error'
+        ? 'Unavailable'
+        : 'Not loaded');
+
   return (
     <div className="tab-pane tab-pane-scroll" role="tabpanel" aria-label="Transfer tab">
       {board.session && (
@@ -18,6 +26,21 @@ export function TransferTabPanel({ board }: TransferTabPanelProps) {
           <div>
             <dt>Network</dt>
             <dd>{board.session.config.networkId}</dd>
+          </div>
+          <div className="asset-balance-card">
+            <div className="asset-balance-copy">
+              <dt>Available NIGHT</dt>
+              <dd className="asset-balance-value">{balanceLabel}</dd>
+              {board.balanceError && <p className="asset-balance-error">{board.balanceError}</p>}
+            </div>
+            <button
+              type="button"
+              className="button-secondary asset-balance-refresh-button"
+              onClick={board.refreshAvailableNight}
+              disabled={!board.canRefreshBalance}
+            >
+              {board.balanceStatus === 'loading' ? 'Refreshing...' : 'Refresh'}
+            </button>
           </div>
           <div>
             <dt>Unshielded address</dt>

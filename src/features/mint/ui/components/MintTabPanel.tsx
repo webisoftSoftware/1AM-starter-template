@@ -12,6 +12,15 @@ function shorten(value: string, head = 14, tail = 8): string {
 
 export function MintTabPanel({ board }: MintTabPanelProps) {
   const recipient = board.session?.shieldedAddress;
+  const tokenBalanceLabel =
+    board.availableMintToken ??
+    (board.mintTokenBalanceStatus === 'loading'
+      ? 'Loading...'
+      : board.mintTokenBalanceStatus === 'unavailable' || board.mintTokenBalanceStatus === 'error'
+        ? 'Unavailable'
+        : board.contractAddress
+          ? 'Not loaded'
+          : 'Deploy contract first');
 
   return (
     <div className="tab-pane tab-pane-scroll" role="tabpanel" aria-label="Mint tab">
@@ -48,6 +57,23 @@ export function MintTabPanel({ board }: MintTabPanelProps) {
           <div>
             <dt>Shielded recipient</dt>
             <dd title={recipient?.shieldedAddress}>{shorten(recipient?.shieldedAddress ?? '')}</dd>
+          </div>
+          <div className="asset-balance-card">
+            <div className="asset-balance-copy">
+              <dt>Available minted token</dt>
+              <dd className="asset-balance-value">{tokenBalanceLabel}</dd>
+              {board.mintTokenBalanceError && (
+                <p className="asset-balance-error">{board.mintTokenBalanceError}</p>
+              )}
+            </div>
+            <button
+              type="button"
+              className="button-secondary asset-balance-refresh-button"
+              onClick={board.refreshMintTokenBalance}
+              disabled={!board.canRefreshMintTokenBalance}
+            >
+              {board.mintTokenBalanceStatus === 'loading' ? 'Refreshing...' : 'Refresh'}
+            </button>
           </div>
         </dl>
       )}

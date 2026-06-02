@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { debugError, debugLog, subscribeDebugLogs, type DebugEntry } from '../../../debug';
-import { sendNativeNightTransfer, type OneAmSession } from '../../../oneAm';
+import { getAvailableNativeNight, sendNativeNightTransfer, type OneAmSession } from '../../../oneAm';
 import type { AppTab, BusyAction, WalletStatus } from '../types';
 
 const NIGHT_DECIMALS = 6;
@@ -17,6 +17,8 @@ type ParsedAmount = {
   atomicValue: bigint | null;
   error: string | null;
 };
+
+type BalanceStatus = 'idle' | 'loading' | 'loaded' | 'unavailable' | 'error';
 
 function parseNightAmount(input: string): ParsedAmount {
   const trimmed = input.trim();
@@ -45,12 +47,28 @@ function parseNightAmount(input: string): ParsedAmount {
   return { atomicValue, error: null };
 }
 
+function formatNightAmount(atomicValue: bigint): string {
+  const whole = atomicValue / NIGHT_SCALE;
+  const fraction = atomicValue % NIGHT_SCALE;
+  const wholeText = whole.toLocaleString('en-US');
+
+  if (fraction === 0n) {
+    return wholeText;
+  }
+
+  const fractionText = fraction.toString().padStart(NIGHT_DECIMALS, '0').replace(/0+$/, '');
+  return `${wholeText}.${fractionText}`;
+}
+
 export function useTransfer({ session, walletStatus, statusText, connectWallet }: UseTransferOptions) {
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [activeTab, setActiveTab] = useState<AppTab>('transfer');
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   const [lastTxId, setLastTxId] = useState('');
+  const [availableNightAtomic, setAvailableNightAtomic] = useState<bigint | null>(null);
+  const [balanceStatus, setBalanceStatus] = useState<BalanceStatus>('idle');
+  const [balanceError, setBalanceError] = useState('');
   const [feedback, setFeedback] = useState('Connect 1AM to send native NIGHT from your unshielded address.');
   const [error, setError] = useState('');
   const [debugEntries, setDebugEntries] = useState<DebugEntry[]>([]);
@@ -65,6 +83,40 @@ export function useTransfer({ session, walletStatus, statusText, connectWallet }
 
   const isConnected = session !== null;
 
+  const refreshAvailableNight = useCallback(async () => {
+    if (!session) {
+      setAvailableNightAtomic(null);
+      setBalanceStatus('idle');
+      setBalanceError('');
+      return;
+    }
+
+    try {
+      setBalanceStatus('loading');
+      setBalanceError('');
+      debugLog('app', 'transferBalance:start', { networkId: session.config.networkId });
+      const balance = await getAvailableNativeNight(session.api);
+      setAvailableNightAtomic(balance);
+      setBalanceStatus('loaded');
+      debugLog('app', 'transferBalance:success', { atomicValue: balance.toString() });
+    } catch (balanceLookupError) {
+      debugError('app', 'transferBalance:error', balanceLookupError);
+      setAvailableNightAtomic(null);
+      setBalanceStatus(
+        balanceLookupError instanceof Error && balanceLookupError.message.includes('does not expose')
+          ? 'unavailable'
+          : 'error',
+      );
+      setBalanceError(
+        balanceLookupError instanceof Error ? balanceLookupError.message : 'Unable to load the NIGHT balance.',
+      );
+    }
+  }, [session]);
+
+  useEffect(() => {
+    void refreshAvailableNight();
+  }, [refreshAvailableNight]);
+
   const parsedAmount = useMemo(() => parseNightAmount(amount), [amount]);
 
   const transferValidationError = useMemo(() => {
@@ -76,10 +128,20 @@ export function useTransfer({ session, walletStatus, statusText, connectWallet }
       return parsedAmount.error;
     }
 
+    if (
+      availableNightAtomic !== null &&
+      parsedAmount.atomicValue !== null &&
+      parsedAmount.atomicValue > availableNightAtomic
+    ) {
+      return 'Amount exceeds available NIGHT.';
+    }
+
     return null;
-  }, [parsedAmount, recipient]);
+  }, [availableNightAtomic, parsedAmount, recipient]);
 
   const canSendTransfer = Boolean(session && busyAction === null);
+  const canRefreshBalance = Boolean(session && busyAction === null && balanceStatus !== 'loading');
+  const availableNight = availableNightAtomic === null ? null : `${formatNightAmount(availableNightAtomic)} NIGHT`;
 
   const sendTransfer = async () => {
     if (!session) {
@@ -106,6 +168,7 @@ export function useTransfer({ session, walletStatus, statusText, connectWallet }
       const txId = await sendNativeNightTransfer(session.api, trimmedRecipient, parsedAmount.atomicValue);
       setLastTxId(txId);
       setFeedback('Transfer submitted.');
+      void refreshAvailableNight();
       debugLog('app', 'transfer:success', { txId });
     } catch (transferError) {
       debugError('app', 'transfer:error', transferError);
@@ -133,12 +196,18 @@ export function useTransfer({ session, walletStatus, statusText, connectWallet }
     setAmount,
     parsedAmount,
     transferValidationError,
+    availableNight,
+    availableNightAtomic,
+    balanceStatus,
+    balanceError,
     lastTxId,
     feedback,
     error,
     debugEntries,
     canSendTransfer,
+    canRefreshBalance,
     connectWallet,
+    refreshAvailableNight,
     sendTransfer,
     clearDebugEntries,
   };
