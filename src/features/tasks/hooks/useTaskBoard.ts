@@ -102,7 +102,7 @@ export function useTaskBoard({ oneAmSession, walletStatus, statusText, connectWa
         setFeedback('Wallet connected. Deploy the task contract once, then manage your task list.');
 
         if (contractAddress) {
-          await refreshTasks(nextSession, contractAddress, false);
+          await refreshTasks(nextSession, contractAddress, { showBusyState: false });
         }
       } catch (providerError) {
         debugError('tasks', 'providers:init:error', providerError);
@@ -238,8 +238,9 @@ export function useTaskBoard({ oneAmSession, walletStatus, statusText, connectWa
   const refreshTasks = async (
     activeSession: TaskContractSession,
     activeContractAddress: string,
-    showBusyState = true,
+    options: { showBusyState?: boolean; treatMissingAsTransient?: boolean } = {},
   ) => {
+    const { showBusyState = true, treatMissingAsTransient = false } = options;
     if (!activeContractAddress) {
       setTasks([]);
       setSavedPayload(serializeTaskPayload([]));
@@ -289,7 +290,11 @@ export function useTaskBoard({ oneAmSession, walletStatus, statusText, connectWa
     } catch (refreshError) {
       debugError('app', 'refreshTasks:error', refreshError);
       if (isMissingPublicStateError(refreshError)) {
-        clearContractState('No indexed contract state was found for the saved address. Deploy a fresh contract to continue.');
+        if (treatMissingAsTransient) {
+          return false;
+        }
+
+        setFeedback('No indexed contract state was found for this address. If deployment is still pending, wait and refresh again; otherwise clear the saved address and deploy a fresh contract.');
       }
 
       setError(
@@ -304,14 +309,19 @@ export function useTaskBoard({ oneAmSession, walletStatus, statusText, connectWa
   };
 
   const waitForContractSnapshot = async (activeSession: TaskContractSession, activeContractAddress: string) => {
-    for (let attempt = 1; attempt <= 10; attempt += 1) {
+    for (let attempt = 1; attempt <= 30; attempt += 1) {
       debugLog('app', 'waitForContractSnapshot:attempt', { activeContractAddress, attempt });
 
-      if (await refreshTasks(activeSession, activeContractAddress, false)) {
+      if (
+        await refreshTasks(activeSession, activeContractAddress, {
+          showBusyState: false,
+          treatMissingAsTransient: true,
+        })
+      ) {
         return true;
       }
 
-      await new Promise((resolve) => window.setTimeout(resolve, 1500));
+      await new Promise((resolve) => window.setTimeout(resolve, 2000));
     }
 
     return false;
@@ -386,10 +396,10 @@ export function useTaskBoard({ oneAmSession, walletStatus, statusText, connectWa
         if (hydrated) {
           setFeedback('Contract deployed and state loaded. You can now manage tasks.');
         } else {
-          clearContractState(
-            `The new contract address never appeared in the ${APP_CONFIG.oneAmNetwork} indexer. Try deploying again.`,
+          setFeedback(
+            `Deployment was submitted, but the ${APP_CONFIG.oneAmNetwork} indexer has not exposed the contract state yet. Use Refresh after the wallet transaction finishes.`,
           );
-          setError('Deployment did not produce indexed public state, so the provisional contract address was cleared.');
+          setError('Indexed public state is still unavailable. The submitted contract address was kept for refresh.');
         }
       }
     } catch (deployError) {
