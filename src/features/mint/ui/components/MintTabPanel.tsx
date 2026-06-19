@@ -80,9 +80,9 @@ export function MintTabPanel({ board }: MintTabPanelProps) {
 
       <div className="stack">
         <div className="field contract-address-row">
-          <label htmlFor="contract-address">Mint contract address</label>
+          <label htmlFor="mint-contract-address">Mint contract address</label>
           <input
-            id="contract-address"
+            id="mint-contract-address"
             value={board.contractAddress || 'Not deployed yet'}
             title={board.contractAddress || 'Not deployed yet'}
             readOnly

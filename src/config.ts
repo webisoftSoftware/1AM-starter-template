@@ -24,4 +24,8 @@ export const APP_CONFIG = {
     '/zk/shieldedTodo',
   ),
   zkMintAssetBasePath: readNonEmpty(import.meta.env.VITE_ZK_MINT_ASSET_BASE_PATH, '/zk/shieldedMint'),
+  zkLeaderboardAssetBasePath: readNonEmpty(
+    import.meta.env.VITE_ZK_LEADERBOARD_ASSET_BASE_PATH,
+    '/zk/leaderboard',
+  ),
 } as const;
