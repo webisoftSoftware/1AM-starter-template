@@ -12,6 +12,7 @@ import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import type { ContractProviders } from '@midnight-ntwrk/midnight-js-contracts';
 import {
   createProofProvider,
+  type MidnightProviders,
   type MidnightProvider,
   type PrivateStateExport,
   type PrivateStateId,
@@ -26,13 +27,22 @@ import {
 import { debugError, debugLog } from './debug';
 import { APP_CONFIG } from './config';
 import type { OneAmSession } from './oneAm';
+import type { LeaderboardPrivateState } from './leaderboardContract';
 
 export type TodoProviders = ContractProviders<any, 'storeTodo', undefined>;
 export type MintProviders = ContractProviders<any, 'mintShielded', undefined>;
+export type LeaderboardCircuitKeys = 'submitScore' | 'verifyOwnership';
+export type LeaderboardPrivateStateId = 'leaderboardPrivateState';
+export type LeaderboardProviders = MidnightProviders<
+  LeaderboardCircuitKeys,
+  LeaderboardPrivateStateId,
+  LeaderboardPrivateState
+>;
 export type TodoContractMode = 'unshielded' | 'shielded';
 export type TodoProvidersByMode = Record<TodoContractMode, TodoProviders>;
 
-type BrowserPrivateStateProvider = PrivateStateProvider<PrivateStateId, undefined>;
+type BrowserPrivateStateProvider<PSI extends PrivateStateId = PrivateStateId, PS = undefined> =
+  PrivateStateProvider<PSI, PS>;
 
 type GraphQlResponse<T> = {
   data?: T;
@@ -310,12 +320,15 @@ function createPatchedPublicDataProvider(queryUrl: string, subscriptionUrl: stri
   };
 }
 
-function createPrivateStateProvider(): BrowserPrivateStateProvider {
+function createPrivateStateProvider<
+  PSI extends PrivateStateId = PrivateStateId,
+  PS = undefined,
+>(): BrowserPrivateStateProvider<PSI, PS> {
   let contractAddressScope = '';
-  const stateStore = new Map<string, undefined>();
+  const stateStore = new Map<string, PS>();
   const signingKeyStore = new Map<string, unknown>();
 
-  const scopedStateKey = (privateStateId: string) => `${contractAddressScope}:${privateStateId}`;
+  const scopedStateKey = (privateStateId: PSI) => `${contractAddressScope}:${privateStateId}`;
 
   const unsupported = async (): Promise<never> => {
     throw new Error('Private state export is not implemented in this minimal dApp.');
@@ -526,6 +539,30 @@ export async function createMintProviders(session: OneAmSession): Promise<MintPr
     prove: (serializedPreimage, keyLocation, overwriteBindingInput) =>
       baseProvingProvider.prove(serializedPreimage, tagNonce(keyLocation), overwriteBindingInput),
   };
+
+  return {
+    privateStateProvider,
+    publicDataProvider,
+    zkConfigProvider,
+    proofProvider: createProofProvider(provingProvider),
+    walletProvider,
+    midnightProvider,
+  };
+}
+
+export async function createLeaderboardProviders(session: OneAmSession): Promise<LeaderboardProviders> {
+  setNetworkId(session.config.networkId);
+
+  const privateStateProvider =
+    createPrivateStateProvider<LeaderboardPrivateStateId, LeaderboardPrivateState>();
+  const walletProvider = createWalletProvider(session);
+  const midnightProvider = createMidnightProvider(session);
+  const publicDataProvider = createPatchedPublicDataProvider(session.config.indexerUri, session.config.indexerWsUri);
+  const zkConfigProvider = new FetchZkConfigProvider<LeaderboardCircuitKeys>(
+    new URL(APP_CONFIG.zkLeaderboardAssetBasePath, window.location.origin).toString(),
+    window.fetch.bind(window),
+  );
+  const provingProvider = await session.api.getProvingProvider(zkConfigProvider.asKeyMaterialProvider());
 
   return {
     privateStateProvider,

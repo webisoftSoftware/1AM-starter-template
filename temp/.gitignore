@@ -1,0 +1,7 @@
+node_modules/
+contract/dist/
+api/dist/
+leaderboard-ui/dist/
+leaderboard-ui/.vite/
+leaderboard-ui/public/keys/
+leaderboard-ui/public/zkir/

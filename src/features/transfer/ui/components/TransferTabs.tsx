@@ -19,7 +19,7 @@ export function TransferTabs({ board }: TransferTabsProps) {
           key={tab.id}
           role="tab"
           aria-selected={board.activeTab === tab.id}
-          className={`tab ${board.activeTab === tab.id ? 'tab-active' : ''}`}
+          className={`tab-button ${board.activeTab === tab.id ? 'tab-button-active' : ''}`}
           onClick={() => board.setActiveTab(tab.id)}
         >
           {tab.label}

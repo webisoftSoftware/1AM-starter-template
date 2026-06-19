@@ -2,21 +2,23 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { APP_CONFIG } from './config';
 import { debugError, debugLog } from './debug';
 import TaskBoardPage from './features/tasks/ui/TaskBoardPage';
+import LeaderboardPage from './features/leaderboard/ui/LeaderboardPage';
 import MintPage from './features/mint/ui/MintPage';
 import TransferPage from './features/transfer/ui/TransferPage';
 import { connectOneAm, getOneAmWallet, type OneAmSession } from './oneAm';
 
-type WorkspaceTab = 'tasks' | 'mint' | 'transfer';
+type WorkspaceTab = 'tasks' | 'leaderboard' | 'mint' | 'transfer';
 type WalletStatus = 'checking' | 'detected' | 'not-found';
 
 const BRAND_LOGO_SRC = '/branding/1am-logo-black.svg';
 const DETECT_TIMEOUT_MS = 6000;
 const DETECT_INTERVAL_MS = 300;
 
-const WORKSPACE_TABS: Array<{ id: WorkspaceTab; label: string }> = [
-  { id: 'tasks', label: 'Task Board' },
-  { id: 'mint', label: 'Shielded Mint' },
-  { id: 'transfer', label: 'NIGHT Transfer' },
+const WORKSPACE_TABS: Array<{ id: WorkspaceTab; label: string; description: string }> = [
+  { id: 'tasks', label: 'Task Board', description: 'Public or shielded TODO state' },
+  { id: 'leaderboard', label: 'Leaderboard', description: 'On-chain click scores' },
+  { id: 'mint', label: 'Shielded Mint', description: 'Mint private wallet tokens' },
+  { id: 'transfer', label: 'NIGHT Transfer', description: 'Send unshielded NIGHT' },
 ];
 
 function shorten(value: string, head = 14, tail = 8): string {
@@ -112,7 +114,7 @@ function App() {
             <div>
               <p className="eyebrow">{APP_CONFIG.oneAmNetwork} network</p>
               <h1>1AM dApp Workspace</h1>
-              <p className="lead">Try the task board, shielded mint, and NIGHT transfer examples from one connected session.</p>
+              <p className="lead">Try the task board, leaderboard, shielded mint, and NIGHT transfer examples from one connected session.</p>
             </div>
           </div>
 
@@ -164,7 +166,7 @@ function App() {
         {connectionError && <p className="error">{connectionError}</p>}
 
         <nav className="workspace-tabs" aria-label="dApp examples">
-          {WORKSPACE_TABS.map((tab) => (
+          {WORKSPACE_TABS.map((tab, index) => (
             <button
               key={tab.id}
               type="button"
@@ -172,7 +174,11 @@ function App() {
               onClick={() => setActiveTab(tab.id)}
               aria-pressed={activeTab === tab.id}
             >
-              {tab.label}
+              <span className="workspace-tab-index">{String(index + 1).padStart(2, '0')}</span>
+              <span className="workspace-tab-copy">
+                <span className="workspace-tab-label">{tab.label}</span>
+                <span className="workspace-tab-description">{tab.description}</span>
+              </span>
             </button>
           ))}
         </nav>
@@ -180,6 +186,9 @@ function App() {
         <section className="workspace-content">
           <div className="workspace-dapp" hidden={activeTab !== 'tasks'}>
             <TaskBoardPage {...sharedDappProps} />
+          </div>
+          <div className="workspace-dapp" hidden={activeTab !== 'leaderboard'}>
+            <LeaderboardPage {...sharedDappProps} />
           </div>
           <div className="workspace-dapp" hidden={activeTab !== 'mint'}>
             <MintPage {...sharedDappProps} />

@@ -1,0 +1,192 @@
+:root {
+  color: #17202a;
+  background: #f4f7fb;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  border: 1px solid #223248;
+  border-radius: 6px;
+  background: #223248;
+  color: white;
+  cursor: pointer;
+  min-height: 40px;
+  padding: 0 14px;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+input {
+  border: 1px solid #b9c4d4;
+  border-radius: 6px;
+  min-height: 40px;
+  padding: 0 12px;
+}
+
+.app-shell {
+  margin: 0 auto;
+  max-width: 980px;
+  padding: 32px 20px 56px;
+}
+
+.topbar,
+.contract-row,
+.join-panel,
+.game-panel,
+.leaderboard-heading,
+.submit-panel,
+.mode-row,
+.error {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.topbar {
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.topbar h1,
+.game-panel h2,
+.leaderboard-heading h2 {
+  margin: 0;
+}
+
+.topbar p,
+.game-panel p {
+  margin: 4px 0 0;
+  color: #5b6675;
+}
+
+.wallet-box {
+  color: #354258;
+  text-align: right;
+}
+
+.error {
+  background: #fff0ed;
+  border: 1px solid #e79787;
+  border-radius: 6px;
+  color: #8b2f22;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding: 12px;
+}
+
+.error button {
+  background: #8b2f22;
+  border-color: #8b2f22;
+}
+
+.contract-row,
+.join-panel,
+.game-panel,
+section:last-child {
+  background: white;
+  border: 1px solid #d9e0ea;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  padding: 16px;
+}
+
+.contract-row,
+.leaderboard-heading {
+  justify-content: space-between;
+}
+
+.join-panel input {
+  flex: 1;
+  min-width: 220px;
+}
+
+.game-panel {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.click-button {
+  background: #b8324a;
+  border-color: #b8324a;
+  font-size: 28px;
+  font-weight: 800;
+  height: 150px;
+}
+
+.submit-panel {
+  align-items: flex-start;
+  border-top: 1px solid #d9e0ea;
+  flex-direction: column;
+  padding-top: 16px;
+}
+
+.mode-row button {
+  background: #eef2f7;
+  border-color: #b9c4d4;
+  color: #17202a;
+}
+
+.mode-row button.active {
+  background: #1d6f5f;
+  border-color: #1d6f5f;
+  color: white;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th,
+td {
+  border-bottom: 1px solid #d9e0ea;
+  padding: 10px 8px;
+  text-align: left;
+}
+
+th {
+  color: #5b6675;
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.verified {
+  color: #1d6f5f;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.empty {
+  color: #5b6675;
+}
+
+@media (max-width: 720px) {
+  .topbar,
+  .contract-row,
+  .join-panel,
+  .leaderboard-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .wallet-box {
+    text-align: left;
+  }
+}

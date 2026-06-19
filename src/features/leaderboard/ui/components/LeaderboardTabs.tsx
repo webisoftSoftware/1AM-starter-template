@@ -1,17 +1,19 @@
-import type { MintViewModel } from '../types';
+import type { AppTab } from '../../types';
+import type { LeaderboardViewModel } from '../types';
 
-type MintTabsProps = {
-  board: MintViewModel;
+type LeaderboardTabsProps = {
+  board: LeaderboardViewModel;
 };
 
-const TABS: Array<{ id: 'mint' | 'debug'; label: string }> = [
-  { id: 'mint', label: 'Mint' },
+const TABS: Array<{ id: AppTab; label: string }> = [
+  { id: 'play', label: 'Play' },
+  { id: 'scores', label: 'Scores' },
   { id: 'debug', label: 'Debug' },
 ];
 
-export function MintTabs({ board }: MintTabsProps) {
+export function LeaderboardTabs({ board }: LeaderboardTabsProps) {
   return (
-    <nav className="tabs" role="tablist" aria-label="Mint sections">
+    <nav className="tabs" role="tablist" aria-label="Leaderboard sections">
       {TABS.map((tab) => (
         <button
           type="button"
