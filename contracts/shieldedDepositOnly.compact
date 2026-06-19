@@ -1,0 +1,21 @@
+pragma language_version 0.23;
+
+import CompactStandardLibrary;
+
+export ledger sourceContract: ContractAddress;
+export ledger totalDeposited: Uint<128>;
+export ledger depositCount: Counter;
+
+constructor(sourceContractAddress: ContractAddress) {
+  sourceContract = disclose(sourceContractAddress);
+  totalDeposited = 0;
+}
+
+export circuit depositShielded(coin: ShieldedCoinInfo): [] {
+  assert(coin.color == tokenType(pad(32, "1am-shielded-mint"), sourceContract), "invalid token color");
+
+  const received = disclose(coin);
+  receiveShielded(received);
+  totalDeposited = (totalDeposited + received.value) as Uint<128>;
+  depositCount.increment(1);
+}

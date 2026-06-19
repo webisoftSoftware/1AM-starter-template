@@ -1,0 +1,8 @@
+{
+  "version": 3,
+  "file": "index.js",
+  "sourceRoot": "../../../../",
+  "sources": ["contracts/shieldedDepositOnly.compact", "compiler/standard-library.compact"],
+  "names": [],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;EAQA;;;;;;;;;;MAKA,AAAA,eAOC;;;;;cAP8B,MAAsB;;;;;;;;;;;;;;;;;;yCAAtB,MAAsB;;;;;;;;;iDAAtB,MAAsB;;;OAOpD;;;;GATA;EAHD;;;;;UAAY,uBAAsC;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;IAJlD;;;;;;;;;yEAA8C;IAC9C;;;;;;;;;yEAAwC;IACxC;;;;;;;;;yEAAoC;IAGlC;;;;;;;2HAA0B,uBAAqB;;yEAAjC;UACd,KAAc;IAAd;;;;;;;2HAAA,KAAc;;yEAAA;;;;;;;GACf;EC8BD,AAAA,SAA2B;yEACqC;;EA8EhE,AAAA,aAAyB,cAAuB;qCACC,cAAY;;;EAiC7D,AAAA,8CAA+B;UACvB,oDAAuD;;;;;;;;;;;;yDAC3C,QAAM;UACxB,+BAA4C,QAAM;IAAlD;;;;;;;;;;;2HAAA;;;;;;;;EA8FF,AAAA,kBACE,QACA;;;0CAKU;8CACI;;sCACJ;sCAAoB;sCAAuB;;EApQvD,AAAA,kBAAA;oEAAA;;;EAAA,AAAA,oBAAA,SAAA;;uDAAA;uDAAA;;;EAAA,AAAA,gDAAA,QAAA;;wDAAA;wDAAA;;;;;;;EDaA,AAAA,kBAOC,4BAP8B,MAAsB;0CAC5C,MAAI;;oFAAkD;;;;;;;;;;;yJAAc;;UAErE,UAAyB,GAAL,MAAI;uDACd,UAAQ;UACxB,KAAc;;;;;6CAAI;;;;;;;;;;;kHAAc;;qBAAG,UAAQ;IAA3C;;;;;;;2HAAA,KAAc;;yEAAA;UACd,KAAY;IAAZ;;;;;;;;;;6FAAA,KAAY;;;;wEAAA;;GACb;;;;;;;;;;;;;;;;;;;;IAhBD;qCAAA;;;;;;;;;;;0GAA8C;KAAA;IAC9C;qCAAA;;;;;;;;;;;0GAAwC;KAAA;IACxC;sCAAA;;;;;;;;;;;2GAAoC;KAAA;;;;;;;;;;"
+}

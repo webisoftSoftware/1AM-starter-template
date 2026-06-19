@@ -85,7 +85,7 @@ body {
 
 .workspace-tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.55rem;
   border-bottom: 1px solid var(--gray-300);
   padding-bottom: 0.75rem;
@@ -312,6 +312,11 @@ h3 {
 .actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.repro-actions {
+  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+  width: 100%;
 }
 
 .actions-toolbar {
@@ -571,10 +576,19 @@ button:disabled {
   font-size: 0.78rem;
 }
 
+.repro-details-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .summary-grid,
 .task-form-grid,
 .filter-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.repro-form-grid,
+.repro-counter-grid {
+  margin-top: 0.85rem;
 }
 
 .task-form-grid,
@@ -1022,6 +1036,7 @@ dd {
 
   .summary-grid,
   .workspace-session,
+  .repro-details-grid,
   .task-form-grid,
   .filter-grid {
     grid-template-columns: 1fr;

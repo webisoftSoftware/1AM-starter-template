@@ -31,6 +31,9 @@ import type { LeaderboardPrivateState } from './leaderboardContract';
 
 export type TodoProviders = ContractProviders<any, 'storeTodo', undefined>;
 export type MintProviders = ContractProviders<any, 'mintShielded', undefined>;
+export type MintDepositCircuitKeys = 'mintShielded' | 'depositShielded';
+export type MintDepositProviders = ContractProviders<any, MintDepositCircuitKeys, undefined>;
+export type DepositOnlyProviders = ContractProviders<any, 'depositShielded', undefined>;
 export type LeaderboardCircuitKeys = 'submitScore' | 'verifyOwnership';
 export type LeaderboardPrivateStateId = 'leaderboardPrivateState';
 export type LeaderboardProviders = MidnightProviders<
@@ -440,6 +443,131 @@ function createMidnightProvider(session: OneAmSession): MidnightProvider {
   };
 }
 
+function createLoggingFetch(scope: string): typeof window.fetch {
+  return async (input, init) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    debugLog('zkConfigProvider', 'fetch:start', { scope, url });
+    const response = await window.fetch(input, {
+      ...init,
+      cache: 'no-store',
+    });
+    const contentType = response.headers.get('content-type') ?? '';
+    const contentLength = response.headers.get('content-length');
+    debugLog('zkConfigProvider', 'fetch:response', {
+      scope,
+      url,
+      status: response.status,
+      contentType,
+      contentLength,
+      ok: response.ok,
+      looksLikeHtml: contentType.includes('text/html'),
+    });
+    if (response.ok && isZkArtifactUrl(url)) {
+      const preview = new Uint8Array(await response.clone().arrayBuffer()).slice(0, 32);
+      const previewText = new TextDecoder().decode(preview).toLowerCase();
+      if (contentType.includes('text/html') || previewText.includes('<!doctype') || previewText.includes('<html')) {
+        const previewHex = toHex(preview);
+        debugError('zkConfigProvider', 'fetch:unexpected-html-artifact', {
+          scope,
+          url,
+          status: response.status,
+          contentType,
+          contentLength,
+          previewText,
+          previewHex,
+        });
+        throw new Error(
+          `ZK artifact request returned HTML instead of binary data. url=${url} status=${response.status} content-type=${contentType || 'unknown'}`,
+        );
+      }
+    }
+    return response;
+  };
+}
+
+function isZkArtifactUrl(url: string): boolean {
+  return (
+    url.includes('/keys/') ||
+    url.includes('/zkir/') ||
+    url.endsWith('.prover') ||
+    url.endsWith('.verifier') ||
+    url.endsWith('.bzkir')
+  );
+}
+
+async function createNonceSafeProofProvider<K extends string>(
+  session: OneAmSession,
+  zkConfigProvider: ZKConfigProvider<K>,
+): Promise<ReturnType<typeof createProofProvider>> {
+  const nonceSeparator = '#nonce=';
+  const stripNonce = (keyLocation: string) => {
+    const index = keyLocation.indexOf(nonceSeparator);
+    return index === -1 ? keyLocation : keyLocation.slice(0, index);
+  };
+  const tagNonce = (keyLocation: string) => `${keyLocation}${nonceSeparator}${crypto.randomUUID()}`;
+
+  class NonceStrippingZkConfigProvider extends ZKConfigProvider<string> {
+    constructor(private readonly inner: ZKConfigProvider<string>) {
+      super();
+    }
+
+    getProverKey(circuitId: string) {
+      return this.inner.getProverKey(stripNonce(circuitId));
+    }
+
+    getVerifierKey(circuitId: string) {
+      return this.inner.getVerifierKey(stripNonce(circuitId));
+    }
+
+    getZKIR(circuitId: string) {
+      return this.inner.getZKIR(stripNonce(circuitId));
+    }
+  }
+
+  class SystemAwareZkConfigProvider extends ZKConfigProvider<string> {
+    private readonly systemProvider = new FetchZkConfigProvider<string>(
+      new URL(APP_CONFIG.zkMintAssetBasePath, window.location.origin).toString(),
+      createLoggingFetch('system'),
+    );
+
+    constructor(private readonly contractProvider: ZKConfigProvider<string>) {
+      super();
+    }
+
+    private providerFor(circuitId: string) {
+      return circuitId.startsWith('midnight/') ? this.systemProvider : this.contractProvider;
+    }
+
+    getProverKey(circuitId: string) {
+      return this.providerFor(circuitId).getProverKey(circuitId);
+    }
+
+    getVerifierKey(circuitId: string) {
+      return this.providerFor(circuitId).getVerifierKey(circuitId);
+    }
+
+    getZKIR(circuitId: string) {
+      return this.providerFor(circuitId).getZKIR(circuitId);
+    }
+  }
+
+  const systemAwareZkConfigProvider = new SystemAwareZkConfigProvider(
+    zkConfigProvider as unknown as ZKConfigProvider<string>,
+  );
+  const dedupSafeZkConfigProvider = new NonceStrippingZkConfigProvider(
+    systemAwareZkConfigProvider,
+  );
+  const baseProvingProvider = await session.api.getProvingProvider(dedupSafeZkConfigProvider.asKeyMaterialProvider());
+  const provingProvider: ProvingProvider = {
+    check: (serializedPreimage, keyLocation) =>
+      baseProvingProvider.check(serializedPreimage, tagNonce(keyLocation)),
+    prove: (serializedPreimage, keyLocation, overwriteBindingInput) =>
+      baseProvingProvider.prove(serializedPreimage, tagNonce(keyLocation), overwriteBindingInput),
+  };
+
+  return createProofProvider(provingProvider);
+}
+
 export async function createTodoProviders(session: OneAmSession): Promise<TodoProvidersByMode> {
   setNetworkId(session.config.networkId);
 
@@ -484,67 +612,66 @@ export async function createMintProviders(session: OneAmSession): Promise<MintPr
   const midnightProvider = createMidnightProvider(session);
   const publicDataProvider = createPatchedPublicDataProvider(session.config.indexerUri, session.config.indexerWsUri);
 
-  const nonceSeparator = '#nonce=';
-  const stripNonce = (keyLocation: string) => {
-    const index = keyLocation.indexOf(nonceSeparator);
-    return index === -1 ? keyLocation : keyLocation.slice(0, index);
-  };
-  const tagNonce = (keyLocation: string) => `${keyLocation}${nonceSeparator}${crypto.randomUUID()}`;
-
   const zkBaseUrl = new URL(APP_CONFIG.zkMintAssetBasePath, window.location.origin).toString();
-  const loggingFetch: typeof window.fetch = async (input, init) => {
-    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-    debugLog('zkConfigProvider', 'fetch:start', { url });
-    const response = await window.fetch(input, init);
-    const contentType = response.headers.get('content-type') ?? '';
-    const contentLength = response.headers.get('content-length');
-    debugLog('zkConfigProvider', 'fetch:response', {
-      url,
-      status: response.status,
-      contentType,
-      contentLength,
-      ok: response.ok,
-      looksLikeHtml: contentType.includes('text/html'),
-    });
-    return response;
-  };
-  const zkConfigProvider = new FetchZkConfigProvider<'mintShielded'>(zkBaseUrl, loggingFetch);
+  const zkConfigProvider = new FetchZkConfigProvider<'mintShielded'>(zkBaseUrl, createLoggingFetch('mint'));
   debugLog('zkConfigProvider', 'baseURL', { zkBaseUrl });
-
-  class NonceStrippingZkConfigProvider extends ZKConfigProvider<string> {
-    constructor(private readonly inner: ZKConfigProvider<string>) {
-      super();
-    }
-
-    getProverKey(circuitId: string) {
-      return this.inner.getProverKey(stripNonce(circuitId));
-    }
-
-    getVerifierKey(circuitId: string) {
-      return this.inner.getVerifierKey(stripNonce(circuitId));
-    }
-
-    getZKIR(circuitId: string) {
-      return this.inner.getZKIR(stripNonce(circuitId));
-    }
-  }
-
-  const dedupSafeZkConfigProvider = new NonceStrippingZkConfigProvider(
-    zkConfigProvider as unknown as ZKConfigProvider<string>,
-  );
-  const baseProvingProvider = await session.api.getProvingProvider(dedupSafeZkConfigProvider.asKeyMaterialProvider());
-  const provingProvider: ProvingProvider = {
-    check: (serializedPreimage, keyLocation) =>
-      baseProvingProvider.check(serializedPreimage, tagNonce(keyLocation)),
-    prove: (serializedPreimage, keyLocation, overwriteBindingInput) =>
-      baseProvingProvider.prove(serializedPreimage, tagNonce(keyLocation), overwriteBindingInput),
-  };
+  const proofProvider = await createNonceSafeProofProvider(session, zkConfigProvider);
 
   return {
     privateStateProvider,
     publicDataProvider,
     zkConfigProvider,
-    proofProvider: createProofProvider(provingProvider),
+    proofProvider,
+    walletProvider,
+    midnightProvider,
+  };
+}
+
+export async function createMintDepositProviders(session: OneAmSession): Promise<MintDepositProviders> {
+  setNetworkId(session.config.networkId);
+
+  const privateStateProvider = createPrivateStateProvider();
+  const walletProvider = createWalletProvider(session);
+  const midnightProvider = createMidnightProvider(session);
+  const publicDataProvider = createPatchedPublicDataProvider(session.config.indexerUri, session.config.indexerWsUri);
+  const zkBaseUrl = new URL(APP_CONFIG.zkMintDepositAssetBasePath, window.location.origin).toString();
+  const zkConfigProvider = new FetchZkConfigProvider<MintDepositCircuitKeys>(
+    zkBaseUrl,
+    createLoggingFetch('mint-deposit'),
+  );
+  debugLog('zkConfigProvider', 'baseURL', { scope: 'mint-deposit', zkBaseUrl });
+  const proofProvider = await createNonceSafeProofProvider(session, zkConfigProvider);
+
+  return {
+    privateStateProvider,
+    publicDataProvider,
+    zkConfigProvider,
+    proofProvider,
+    walletProvider,
+    midnightProvider,
+  };
+}
+
+export async function createDepositOnlyProviders(session: OneAmSession): Promise<DepositOnlyProviders> {
+  setNetworkId(session.config.networkId);
+
+  const privateStateProvider = createPrivateStateProvider();
+  const walletProvider = createWalletProvider(session);
+  const midnightProvider = createMidnightProvider(session);
+  const publicDataProvider = createPatchedPublicDataProvider(session.config.indexerUri, session.config.indexerWsUri);
+  const zkBaseUrl = new URL(APP_CONFIG.zkDepositOnlyAssetBasePath, window.location.origin).toString();
+  const zkConfigProvider = new FetchZkConfigProvider<'depositShielded'>(
+    zkBaseUrl,
+    createLoggingFetch('deposit-only'),
+  );
+  debugLog('zkConfigProvider', 'baseURL', { scope: 'deposit-only', zkBaseUrl });
+  const proofProvider = await createNonceSafeProofProvider(session, zkConfigProvider);
+
+  return {
+    privateStateProvider,
+    publicDataProvider,
+    zkConfigProvider,
+    proofProvider,
     walletProvider,
     midnightProvider,
   };

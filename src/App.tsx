@@ -4,10 +4,11 @@ import { debugError, debugLog } from './debug';
 import TaskBoardPage from './features/tasks/ui/TaskBoardPage';
 import LeaderboardPage from './features/leaderboard/ui/LeaderboardPage';
 import MintPage from './features/mint/ui/MintPage';
+import DepositReproPage from './features/depositRepro/ui/DepositReproPage';
 import TransferPage from './features/transfer/ui/TransferPage';
 import { connectOneAm, getOneAmWallet, type OneAmSession } from './oneAm';
 
-type WorkspaceTab = 'tasks' | 'leaderboard' | 'mint' | 'transfer';
+type WorkspaceTab = 'tasks' | 'leaderboard' | 'mint' | 'depositRepro' | 'transfer';
 type WalletStatus = 'checking' | 'detected' | 'not-found';
 
 const BRAND_LOGO_SRC = '/branding/1am-logo-black.svg';
@@ -18,6 +19,7 @@ const WORKSPACE_TABS: Array<{ id: WorkspaceTab; label: string; description: stri
   { id: 'tasks', label: 'Task Board', description: 'Public or shielded TODO state' },
   { id: 'leaderboard', label: 'Leaderboard', description: 'On-chain click scores' },
   { id: 'mint', label: 'Shielded Mint', description: 'Mint private wallet tokens' },
+  { id: 'depositRepro', label: 'Shielded Deposit', description: 'Mint then deposit tokens' },
   { id: 'transfer', label: 'NIGHT Transfer', description: 'Send unshielded NIGHT' },
 ];
 
@@ -114,7 +116,7 @@ function App() {
             <div>
               <p className="eyebrow">{APP_CONFIG.oneAmNetwork} network</p>
               <h1>1AM dApp Workspace</h1>
-              <p className="lead">Try the task board, leaderboard, shielded mint, and NIGHT transfer examples from one connected session.</p>
+              <p className="lead">Try the task board, leaderboard, shielded mint, shielded deposit, and NIGHT transfer examples from one connected session.</p>
             </div>
           </div>
 
@@ -192,6 +194,9 @@ function App() {
           </div>
           <div className="workspace-dapp" hidden={activeTab !== 'mint'}>
             <MintPage {...sharedDappProps} />
+          </div>
+          <div className="workspace-dapp" hidden={activeTab !== 'depositRepro'}>
+            <DepositReproPage {...sharedDappProps} />
           </div>
           <div className="workspace-dapp" hidden={activeTab !== 'transfer'}>
             <TransferPage {...sharedDappProps} />

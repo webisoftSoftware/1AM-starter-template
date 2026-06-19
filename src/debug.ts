@@ -10,8 +10,16 @@ type DebugListener = (entry: DebugEntry) => void;
 const listeners = new Set<DebugListener>();
 
 function normalizeErrorLike(value: unknown, depth = 0): unknown {
-  if (depth > 3) {
+  if (depth > 8) {
     return '[Max depth reached]';
+  }
+
+  if (typeof value === 'bigint') {
+    return value.toString();
+  }
+
+  if (value instanceof Uint8Array) {
+    return Array.from(value, (byte) => byte.toString(16).padStart(2, '0')).join('');
   }
 
   if (value instanceof Error) {
@@ -43,6 +51,10 @@ function normalizeErrorLike(value: unknown, depth = 0): unknown {
   }
 
   return value;
+}
+
+export function stringifyDebugValue(value: unknown): string {
+  return JSON.stringify(normalizeErrorLike(value), null, 2);
 }
 
 function timestamp(): string {
