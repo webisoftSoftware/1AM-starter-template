@@ -12,7 +12,6 @@ import type { OneAmSession } from '../../../oneAm';
 import { decryptTodoPayload, encryptTodoPayload, isEncryptedTodoPayload } from '../../../confidentialTodo';
 import { compiledTodoContract, todoLedger } from '../../../todoContract';
 import { compiledShieldedTodoContract } from '../../../shieldedTodoContract';
-import { APP_CONFIG } from '../../../config';
 import { defaultTaskFormState, makeTaskId, parseTagsInput, parseTaskPayload, serializeTaskPayload, toTaskSyncKey } from '../domain/taskPayload';
 import {
   clearStoredShieldedPayload,
@@ -20,6 +19,7 @@ import {
   readStoredContractAddress,
   readStoredShieldedPayload,
   SHIELDED_CONTRACT_ADDRESS_STORAGE_KEY,
+  writeStoredContractAddress,
   writeStoredShieldedPayload,
 } from '../data/taskStorage';
 import type {
@@ -54,7 +54,7 @@ export function useTaskBoard({ oneAmSession, walletStatus, statusText, connectWa
   const [confidentialMode, setConfidentialMode] = useState(false);
   const [session, setSession] = useState<TaskContractSession | null>(null);
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
-  const [contractAddress, setContractAddress] = useState(() => readStoredContractAddress(PUBLIC_CONTRACT_ADDRESS_STORAGE_KEY));
+  const [contractAddress, setContractAddress] = useState('');
   const [contractSnapshot, setContractSnapshot] = useState<ContractSnapshot | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [savedPayload, setSavedPayload] = useState(() => serializeTaskPayload([]));
@@ -82,6 +82,7 @@ export function useTaskBoard({ oneAmSession, walletStatus, statusText, connectWa
 
     if (!oneAmSession) {
       setSession(null);
+      setContractAddress('');
       setFeedback('Connect 1AM to deploy the contract and manage your tasks.');
       return;
     }
@@ -100,10 +101,6 @@ export function useTaskBoard({ oneAmSession, walletStatus, statusText, connectWa
         const nextSession = { ...oneAmSession, providersByMode };
         setSession(nextSession);
         setFeedback('Wallet connected. Deploy the task contract once, then manage your task list.');
-
-        if (contractAddress) {
-          await refreshTasks(nextSession, contractAddress, { showBusyState: false });
-        }
       } catch (providerError) {
         debugError('tasks', 'providers:init:error', providerError);
         if (!cancelled) {
@@ -166,9 +163,9 @@ export function useTaskBoard({ oneAmSession, walletStatus, statusText, connectWa
   };
 
   const clearContractState = (feedbackMessage: string) => {
-    window.localStorage.removeItem(activeStorageKey);
+    writeStoredContractAddress(activeStorageKey, session?.config.networkId, '');
     if (isShieldedMode) {
-      clearStoredShieldedPayload(contractAddress);
+      clearStoredShieldedPayload(contractAddress, session?.config.networkId);
     }
 
     setContractAddress('');
@@ -220,7 +217,7 @@ export function useTaskBoard({ oneAmSession, walletStatus, statusText, connectWa
   };
 
   useEffect(() => {
-    const storedAddress = readStoredContractAddress(activeStorageKey);
+    const storedAddress = session ? readStoredContractAddress(activeStorageKey, session.config.networkId) : '';
     setContractAddress(storedAddress);
     setContractSnapshot(null);
     setTasks([]);
@@ -233,7 +230,11 @@ export function useTaskBoard({ oneAmSession, walletStatus, statusText, connectWa
         ? 'Shielded mode selected. Refresh reloads the shielded private snapshot stored on this device.'
         : 'Unshielded mode selected. Deploy or load a contract, then refresh indexed on-chain state.',
     );
-  }, [activeStorageKey, isShieldedMode]);
+
+    if (session && storedAddress) {
+      void refreshTasks(session, storedAddress, { showBusyState: false });
+    }
+  }, [activeStorageKey, isShieldedMode, session]);
 
   const refreshTasks = async (
     activeSession: TaskContractSession,
@@ -254,7 +255,7 @@ export function useTaskBoard({ oneAmSession, walletStatus, statusText, connectWa
       }
 
       if (isShieldedMode) {
-        const shieldedPayload = readStoredShieldedPayload(activeContractAddress);
+        const shieldedPayload = readStoredShieldedPayload(activeContractAddress, activeSession.config.networkId);
         if (!shieldedPayload) {
           setError('No local shielded state snapshot found for this contract. Save once from this wallet to initialize local refresh.');
           return false;
@@ -337,7 +338,7 @@ export function useTaskBoard({ oneAmSession, walletStatus, statusText, connectWa
       debugLog('app', 'deployTaskContract:start');
       setBusyAction('deploy');
       setError('');
-      setFeedback(`Deploying the task contract to Midnight ${APP_CONFIG.oneAmNetwork}...`);
+      setFeedback(`Deploying the task contract to Midnight ${session.config.networkId}...`);
 
       const providers = session.providersByMode[privacyMode];
       const deployTxData = await createUnprovenDeployTx(
@@ -386,10 +387,10 @@ export function useTaskBoard({ oneAmSession, walletStatus, statusText, connectWa
       setSavedPayload(serializeTaskPayload([]));
       resetTaskForm();
       setFeedback('Contract deployment submitted. Loading the indexed task state...');
-      window.localStorage.setItem(activeStorageKey, nextContractAddress);
+      writeStoredContractAddress(activeStorageKey, session.config.networkId, nextContractAddress);
 
       if (isShieldedMode) {
-        writeStoredShieldedPayload(nextContractAddress, serializeTaskPayload([]));
+        writeStoredShieldedPayload(nextContractAddress, session.config.networkId, serializeTaskPayload([]));
         setFeedback('Shielded contract deployed. Local private snapshot initialized; refresh now reloads shielded state from this device.');
       } else {
         const hydrated = await waitForContractSnapshot(session, nextContractAddress);
@@ -397,7 +398,7 @@ export function useTaskBoard({ oneAmSession, walletStatus, statusText, connectWa
           setFeedback('Contract deployed and state loaded. You can now manage tasks.');
         } else {
           setFeedback(
-            `Deployment was submitted, but the ${APP_CONFIG.oneAmNetwork} indexer has not exposed the contract state yet. Use Refresh after the wallet transaction finishes.`,
+            `Deployment was submitted, but the ${session.config.networkId} indexer has not exposed the contract state yet. Use Refresh after the wallet transaction finishes.`,
           );
           setError('Indexed public state is still unavailable. The submitted contract address was kept for refresh.');
         }
@@ -473,7 +474,7 @@ export function useTaskBoard({ oneAmSession, walletStatus, statusText, connectWa
             : currentSnapshot,
         );
       } else {
-        writeStoredShieldedPayload(contractAddress, payloadForChain);
+        writeStoredShieldedPayload(contractAddress, session.config.networkId, payloadForChain);
       }
 
       setFeedback(

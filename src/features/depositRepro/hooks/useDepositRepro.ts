@@ -31,6 +31,7 @@ import { getAvailableShieldedMintToken, shieldedMintTokenType, type OneAmSession
 import { decodeShieldedCoinPublicKey } from '../../mint/domain/shieldedAddress';
 import {
   DEPOSIT_ONLY_CONTRACT_ADDRESS_STORAGE_KEY,
+  depositReproContractAddressStorageKey,
   MINT_DEPOSIT_CONTRACT_ADDRESS_STORAGE_KEY,
   readStoredDepositOnlyContractAddress,
   readStoredMintDepositContractAddress,
@@ -190,10 +191,8 @@ export function useDepositRepro({
 }: UseDepositReproOptions) {
   const [session, setSession] = useState<DepositReproSession | null>(null);
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
-  const [mintContractAddress, setMintContractAddress] = useState(() => readStoredMintDepositContractAddress());
-  const [depositOnlyContractAddress, setDepositOnlyContractAddress] = useState(() =>
-    readStoredDepositOnlyContractAddress(),
-  );
+  const [mintContractAddress, setMintContractAddress] = useState('');
+  const [depositOnlyContractAddress, setDepositOnlyContractAddress] = useState('');
   const [mintLoadInput, setMintLoadInput] = useState('');
   const [depositOnlyLoadInput, setDepositOnlyLoadInput] = useState('');
   const [mintDepositSnapshot, setMintDepositSnapshot] = useState<ContractSnapshot | null>(null);
@@ -229,6 +228,8 @@ export function useDepositRepro({
 
     if (!oneAmSession) {
       setSession(null);
+      setMintContractAddress('');
+      setDepositOnlyContractAddress('');
       setAvailableMintTokenAtomic(null);
       setTokenBalanceStatus('idle');
       setTokenBalanceError('');
@@ -254,14 +255,6 @@ export function useDepositRepro({
         const nextSession = { ...oneAmSession, mintDepositProviders, depositOnlyProviders };
         setSession(nextSession);
         setFeedback('Wallet connected. Deploy or load the mint+deposit contract to start the repro.');
-
-        if (mintContractAddress) {
-          await refreshMintDeposit(nextSession, mintContractAddress, { showBusyState: false });
-        }
-
-        if (depositOnlyContractAddress) {
-          await refreshDepositOnly(nextSession, depositOnlyContractAddress, { showBusyState: false });
-        }
       } catch (providerError) {
         debugError('depositRepro', 'providers:init:error', providerError);
         if (!cancelled) {
@@ -281,6 +274,34 @@ export function useDepositRepro({
       cancelled = true;
     };
   }, [oneAmSession]);
+
+  useEffect(() => {
+    const storedMintContractAddress = session
+      ? readStoredMintDepositContractAddress(session.config.networkId)
+      : '';
+    const storedDepositOnlyContractAddress = session
+      ? readStoredDepositOnlyContractAddress(session.config.networkId)
+      : '';
+
+    setMintContractAddress(storedMintContractAddress);
+    setDepositOnlyContractAddress(storedDepositOnlyContractAddress);
+    setMintDepositSnapshot(null);
+    setDepositOnlySnapshot(null);
+    setMintDepositLedgerView(null);
+    setDepositOnlyLedgerView(null);
+    setAvailableMintTokenAtomic(null);
+    setTokenBalanceStatus('idle');
+    setTokenBalanceError('');
+    setLastTxId('');
+
+    if (session && storedMintContractAddress) {
+      void refreshMintDeposit(session, storedMintContractAddress, { showBusyState: false });
+    }
+
+    if (session && storedDepositOnlyContractAddress) {
+      void refreshDepositOnly(session, storedDepositOnlyContractAddress, { showBusyState: false });
+    }
+  }, [session]);
 
   const parsedMintAmount = useMemo(() => parseUint64Input(mintAmount), [mintAmount]);
   const parsedDepositAmount = useMemo(() => parseUint128Input(depositAmount), [depositAmount]);
@@ -578,7 +599,7 @@ export function useDepositRepro({
       setBusyAction('deployMintDeposit');
       setStepState(stepId, { status: 'running', error: '', txId: '' });
       setError('');
-      setFeedback(`Deploying mint+deposit contract to Midnight ${APP_CONFIG.oneAmNetwork}...`);
+      setFeedback(`Deploying mint+deposit contract to Midnight ${session.config.networkId}...`);
       const context = baseContext(step);
 
       const deployTxData = await runDiagnosticStage(`${step}:createUnprovenDeployTx`, context, () =>
@@ -613,7 +634,7 @@ export function useDepositRepro({
       setMintContractAddress(nextContractAddress);
       setMintDepositSnapshot(null);
       setMintDepositLedgerView(null);
-      writeStoredMintDepositContractAddress(nextContractAddress);
+      writeStoredMintDepositContractAddress(nextContractAddress, session.config.networkId);
       setLastTxId(txId);
       setStepState(stepId, { status: 'success', txId, error: '' });
       setFeedback('Mint+deposit deployment submitted. Loading indexed ledger state...');
@@ -645,7 +666,7 @@ export function useDepositRepro({
       setError('');
       setFeedback('Loading mint+deposit contract ledger...');
       setMintContractAddress(nextAddress);
-      writeStoredMintDepositContractAddress(nextAddress);
+      writeStoredMintDepositContractAddress(nextAddress, session.config.networkId);
       const loaded = await refreshMintDeposit(session, nextAddress, { showBusyState: false });
       if (loaded) {
         setMintLoadInput('');
@@ -818,7 +839,7 @@ export function useDepositRepro({
       setDepositOnlyContractAddress(nextContractAddress);
       setDepositOnlySnapshot(null);
       setDepositOnlyLedgerView(null);
-      writeStoredDepositOnlyContractAddress(nextContractAddress);
+      writeStoredDepositOnlyContractAddress(nextContractAddress, session.config.networkId);
       setLastTxId(txId);
       setStepState(stepId, { status: 'success', txId, error: '' });
       setFeedback('Deposit-only deployment submitted. Loading indexed ledger state...');
@@ -850,7 +871,7 @@ export function useDepositRepro({
       setError('');
       setFeedback('Loading deposit-only contract ledger...');
       setDepositOnlyContractAddress(nextAddress);
-      writeStoredDepositOnlyContractAddress(nextAddress);
+      writeStoredDepositOnlyContractAddress(nextAddress, session.config.networkId);
       const loaded = await refreshDepositOnly(session, nextAddress, { showBusyState: false });
       if (loaded) {
         setDepositOnlyLoadInput('');
@@ -927,7 +948,7 @@ export function useDepositRepro({
   };
 
   const clearMintDepositContract = () => {
-    writeStoredMintDepositContractAddress('');
+    writeStoredMintDepositContractAddress('', session?.config.networkId);
     setMintContractAddress('');
     setMintDepositSnapshot(null);
     setMintDepositLedgerView(null);
@@ -938,7 +959,7 @@ export function useDepositRepro({
   };
 
   const clearDepositOnlyContract = () => {
-    writeStoredDepositOnlyContractAddress('');
+    writeStoredDepositOnlyContractAddress('', session?.config.networkId);
     setDepositOnlyContractAddress('');
     setDepositOnlySnapshot(null);
     setDepositOnlyLedgerView(null);
@@ -1033,8 +1054,14 @@ export function useDepositRepro({
     clearRunLog,
     copyRunLog,
     storageKeys: {
-      mintDeposit: MINT_DEPOSIT_CONTRACT_ADDRESS_STORAGE_KEY,
-      depositOnly: DEPOSIT_ONLY_CONTRACT_ADDRESS_STORAGE_KEY,
+      mintDeposit: depositReproContractAddressStorageKey(
+        MINT_DEPOSIT_CONTRACT_ADDRESS_STORAGE_KEY,
+        session?.config.networkId,
+      ),
+      depositOnly: depositReproContractAddressStorageKey(
+        DEPOSIT_ONLY_CONTRACT_ADDRESS_STORAGE_KEY,
+        session?.config.networkId,
+      ),
     },
   };
 }

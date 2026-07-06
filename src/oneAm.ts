@@ -1,5 +1,7 @@
 import { nativeToken, rawTokenType, type ContractAddress } from '@midnight-ntwrk/ledger-v8';
-import type { OneAmNetwork } from './config';
+import { isOneAmNetwork, ONE_AM_NETWORKS, type OneAmNetwork, type OneAmNetworkPreference } from './config';
+
+const LAST_CONNECTED_NETWORK_STORAGE_KEY = 'one-am.last-connected-network';
 
 export type OneAmShieldedAddress = {
   shieldedAddress: string;
@@ -18,18 +20,55 @@ export function getOneAmWallet(): OneAmWallet | null {
   return window.midnight?.['1am'] ?? null;
 }
 
-export async function connectOneAm(network: OneAmNetwork): Promise<OneAmSession> {
-  const wallet = getOneAmWallet();
-  if (!wallet) {
-    throw new Error('1AM wallet was not found in window.midnight["1am"].');
+function readLastConnectedNetwork(): OneAmNetwork | null {
+  try {
+    const value = window.localStorage.getItem(LAST_CONNECTED_NETWORK_STORAGE_KEY);
+    return value && isOneAmNetwork(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLastConnectedNetwork(network: OneAmNetwork): void {
+  try {
+    window.localStorage.setItem(LAST_CONNECTED_NETWORK_STORAGE_KEY, network);
+  } catch {
+    // Local storage is optional; connection still succeeds without remembering the last network.
+  }
+}
+
+function connectionCandidates(preference: OneAmNetworkPreference): OneAmNetwork[] {
+  if (preference !== 'auto') {
+    return [preference];
   }
 
+  const lastConnectedNetwork = readLastConnectedNetwork();
+  return lastConnectedNetwork
+    ? [lastConnectedNetwork, ...ONE_AM_NETWORKS.filter((network) => network !== lastConnectedNetwork)]
+    : [...ONE_AM_NETWORKS];
+}
+
+function extractErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
+async function connectOneAmNetwork(wallet: OneAmWallet, network: OneAmNetwork): Promise<OneAmSession> {
   const api = await wallet.connect(network);
   const [config, unshieldedAddress, shieldedAddress] = await Promise.all([
     api.getConfiguration(),
     api.getUnshieldedAddress(),
     api.getShieldedAddresses(),
   ]);
+  const connectedNetwork = isOneAmNetwork(config.networkId) ? config.networkId : network;
+  writeLastConnectedNetwork(connectedNetwork);
 
   return {
     api,
@@ -37,6 +76,28 @@ export async function connectOneAm(network: OneAmNetwork): Promise<OneAmSession>
     unshieldedAddress: unshieldedAddress.unshieldedAddress,
     shieldedAddress,
   };
+}
+
+export async function connectOneAm(networkPreference: OneAmNetworkPreference): Promise<OneAmSession> {
+  const wallet = getOneAmWallet();
+  if (!wallet) {
+    throw new Error('1AM wallet was not found in window.midnight["1am"].');
+  }
+
+  const errors: string[] = [];
+  for (const network of connectionCandidates(networkPreference)) {
+    try {
+      return await connectOneAmNetwork(wallet, network);
+    } catch (error) {
+      errors.push(`${network}: ${extractErrorMessage(error)}`);
+    }
+  }
+
+  if (networkPreference === 'auto') {
+    throw new Error(`Unable to connect 1AM on preview or preprod. ${errors.join(' ')}`);
+  }
+
+  throw new Error(`Unable to connect 1AM on ${networkPreference}. ${errors.join(' ')}`);
 }
 
 export async function sendNativeNightTransfer(

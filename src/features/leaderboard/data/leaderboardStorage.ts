@@ -1,15 +1,26 @@
+import { storageKeyForNetwork } from '../../../config';
+
 export const LEADERBOARD_CONTRACT_ADDRESS_STORAGE_KEY = 'leaderboard-contract-address';
 export const LEADERBOARD_SECRET_STORAGE_KEY = 'midnight-leaderboard-secret';
 
-export function readStoredLeaderboardContractAddress(): string {
-  return window.localStorage.getItem(LEADERBOARD_CONTRACT_ADDRESS_STORAGE_KEY) ?? '';
+export function leaderboardContractAddressStorageKey(networkId: string | undefined): string {
+  return storageKeyForNetwork(LEADERBOARD_CONTRACT_ADDRESS_STORAGE_KEY, networkId);
 }
 
-export function writeStoredLeaderboardContractAddress(contractAddress: string): void {
+export function readStoredLeaderboardContractAddress(networkId: string | undefined): string {
+  return (
+    window.localStorage.getItem(leaderboardContractAddressStorageKey(networkId)) ??
+    (networkId === 'preview' ? window.localStorage.getItem(LEADERBOARD_CONTRACT_ADDRESS_STORAGE_KEY) : null) ??
+    ''
+  );
+}
+
+export function writeStoredLeaderboardContractAddress(contractAddress: string, networkId: string | undefined): void {
+  const storageKey = leaderboardContractAddressStorageKey(networkId);
   if (contractAddress) {
-    window.localStorage.setItem(LEADERBOARD_CONTRACT_ADDRESS_STORAGE_KEY, contractAddress);
+    window.localStorage.setItem(storageKey, contractAddress);
   } else {
-    window.localStorage.removeItem(LEADERBOARD_CONTRACT_ADDRESS_STORAGE_KEY);
+    window.localStorage.removeItem(storageKey);
   }
 }
 

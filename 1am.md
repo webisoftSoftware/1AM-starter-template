@@ -15,14 +15,14 @@ This file is the implementation reference for using 1AM from this starter templa
 const wallet = window.midnight?.['1am'];
 if (!wallet) throw new Error('Install the 1AM wallet extension.');
 
-const api = await wallet.connect('preview'); // or 'preprod'
+const api = await wallet.connect('preview'); // or 'preprod'; the app tries both in auto mode
 const config = await api.getConfiguration();
 ```
 
 Notes:
 
 - Extension injection can be delayed, so UI code should poll briefly before showing "not found".
-- `connect(networkId)` asks the wallet for approval and must match the wallet/network the user is using.
+- `connect(networkId)` asks the wallet for approval and must match the wallet/network the user is using. In auto mode, the app tries preview and preprod and uses the configuration returned by the successful connection.
 - Use `api.getConfiguration()` instead of hardcoding indexer/node/proof URLs. `proverServerUri` is optional and not needed when using `getProvingProvider`.
 
 ## Connected API Shape

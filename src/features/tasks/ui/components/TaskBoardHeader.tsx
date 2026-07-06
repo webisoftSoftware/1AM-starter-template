@@ -1,5 +1,5 @@
 import type { TaskBoardViewModel } from '../types';
-import { APP_CONFIG } from '../../../../config';
+import { APP_CONFIG, oneAmNetworkLabel } from '../../../../config';
 
 const BRAND_LOGO_SRC = '/branding/1am-logo-black.svg';
 
@@ -13,7 +13,7 @@ export function TaskBoardHeader({ board }: TaskBoardHeaderProps) {
       <div className="brand-intro">
         <img className="brand-logo" src={BRAND_LOGO_SRC} alt="1AM" />
         <div>
-          <p className="eyebrow">{APP_CONFIG.oneAmNetwork} network</p>
+          <p className="eyebrow">{oneAmNetworkLabel(board.session?.config.networkId ?? APP_CONFIG.oneAmNetwork)}</p>
           <h1>On-Chain Task Board</h1>
         </div>
       </div>

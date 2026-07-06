@@ -31,7 +31,7 @@ Open `http://localhost:5173`.
 
 Copy `.env.example` to `.env` and adjust values for your setup.
 
-- `VITE_1AM_NETWORK`: wallet network for 1AM (`preview` or `preprod`)
+- `VITE_1AM_NETWORK`: 1AM wallet network preference (`auto`, `preview`, or `preprod`; defaults to `auto`)
 - `VITE_ZK_TODO_ASSET_BASE_PATH`: unshielded TODO contract ZK asset path
 - `VITE_ZK_SHIELDED_TODO_ASSET_BASE_PATH`: shielded TODO contract ZK asset path
 - `DEV_ALLOWED_HOSTS`: comma-separated hostnames allowed by Vite dev server
@@ -42,7 +42,7 @@ Copy `.env.example` to `.env` and adjust values for your setup.
 
 The dApp should use 1AM as the wallet/relayer boundary, not as a replacement for the Midnight SDK.
 
-1. Detect `window.midnight?.['1am']` and connect with the configured network.
+1. Detect `window.midnight?.['1am']` and connect to the detected preview/preprod wallet network.
 2. Read `api.getConfiguration()` and pass the returned indexer URLs to Midnight providers.
 3. Host the compiled contract assets under `public/zk/...`.
 4. Create a `FetchZkConfigProvider` for each contract asset base path.
@@ -60,7 +60,7 @@ See `1am.md` for a more detailed integration reference.
 
 ## Contract flow
 
-1. Connect wallet on your configured `VITE_1AM_NETWORK`
+1. Connect wallet; the app detects whether 1AM is on preview or preprod
 2. Deploy task contract
 3. Refresh indexed state
 4. Edit tasks locally

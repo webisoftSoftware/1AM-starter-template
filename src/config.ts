@@ -1,11 +1,26 @@
-export type OneAmNetwork = 'preview' | 'preprod';
+export const ONE_AM_NETWORKS = ['preview', 'preprod'] as const;
 
-function readOneAmNetwork(value: string | undefined): OneAmNetwork {
-  if (value === 'preprod') {
-    return 'preprod';
+export type OneAmNetwork = (typeof ONE_AM_NETWORKS)[number];
+export type OneAmNetworkPreference = OneAmNetwork | 'auto';
+
+export function isOneAmNetwork(value: string | undefined): value is OneAmNetwork {
+  return ONE_AM_NETWORKS.includes(value as OneAmNetwork);
+}
+
+function readOneAmNetworkPreference(value: string | undefined): OneAmNetworkPreference {
+  if (isOneAmNetwork(value)) {
+    return value;
   }
 
-  return 'preview';
+  return 'auto';
+}
+
+export function oneAmNetworkLabel(value: OneAmNetworkPreference | string): string {
+  return value === 'auto' ? 'auto network' : `${value} network`;
+}
+
+export function storageKeyForNetwork(baseKey: string, networkId: string | undefined): string {
+  return networkId ? `${baseKey}:${networkId}` : baseKey;
 }
 
 function readNonEmpty(value: string | undefined, fallback: string): string {
@@ -17,7 +32,7 @@ function readNonEmpty(value: string | undefined, fallback: string): string {
 }
 
 export const APP_CONFIG = {
-  oneAmNetwork: readOneAmNetwork(import.meta.env.VITE_1AM_NETWORK),
+  oneAmNetwork: readOneAmNetworkPreference(import.meta.env.VITE_1AM_NETWORK),
   zkTodoAssetBasePath: readNonEmpty(import.meta.env.VITE_ZK_TODO_ASSET_BASE_PATH, '/zk/todo'),
   zkShieldedTodoAssetBasePath: readNonEmpty(
     import.meta.env.VITE_ZK_SHIELDED_TODO_ASSET_BASE_PATH,

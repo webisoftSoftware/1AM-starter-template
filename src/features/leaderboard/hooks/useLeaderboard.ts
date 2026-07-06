@@ -6,7 +6,6 @@ import {
   getPublicStates,
   submitTxAsync,
 } from '@midnight-ntwrk/midnight-js-contracts';
-import { APP_CONFIG } from '../../../config';
 import { debugError, debugLog, subscribeDebugLogs, type DebugEntry } from '../../../debug';
 import {
   compiledLeaderboardContract,
@@ -18,6 +17,7 @@ import {
 import { createLeaderboardProviders, type LeaderboardProviders } from '../../../midnight';
 import type { OneAmSession } from '../../../oneAm';
 import {
+  leaderboardContractAddressStorageKey,
   readOrCreateLeaderboardSecret,
   readStoredLeaderboardContractAddress,
   writeStoredLeaderboardContractAddress,
@@ -130,7 +130,7 @@ export function useLeaderboard({
   );
   const [session, setSession] = useState<LeaderboardSession | null>(null);
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
-  const [contractAddress, setContractAddress] = useState(() => readStoredLeaderboardContractAddress());
+  const [contractAddress, setContractAddress] = useState('');
   const [joinInput, setJoinInput] = useState('');
   const [contractSnapshot, setContractSnapshot] = useState<ContractSnapshot | null>(null);
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
@@ -172,6 +172,7 @@ export function useLeaderboard({
 
     if (!oneAmSession) {
       setSession(null);
+      setContractAddress('');
       setFeedback('Connect 1AM to deploy or load a leaderboard contract.');
       return;
     }
@@ -190,10 +191,6 @@ export function useLeaderboard({
         const nextSession = { ...oneAmSession, providers };
         setSession(nextSession);
         setFeedback('Wallet connected. Deploy a leaderboard or load an existing contract.');
-
-        if (contractAddress) {
-          await refreshLeaderboard(nextSession, contractAddress, { showBusyState: false });
-        }
       } catch (providerError) {
         debugError('leaderboard', 'providers:init:error', providerError);
         if (!cancelled) {
@@ -213,6 +210,22 @@ export function useLeaderboard({
       cancelled = true;
     };
   }, [oneAmSession]);
+
+  useEffect(() => {
+    const storedAddress = session ? readStoredLeaderboardContractAddress(session.config.networkId) : '';
+    setContractAddress(storedAddress);
+    setJoinInput('');
+    setContractSnapshot(null);
+    setEntries([]);
+    setEntryCount(0);
+    setLastTxId('');
+    setVerifiedEntryIds(new Set());
+    setError('');
+
+    if (session && storedAddress) {
+      void refreshLeaderboard(session, storedAddress, { showBusyState: false });
+    }
+  }, [session]);
 
   const validJoinInput = isValidContractAddress(joinInput.trim());
   const isConnected = session !== null;
@@ -322,7 +335,7 @@ export function useLeaderboard({
       debugLog('leaderboard', 'deploy:start');
       setBusyAction('deploy');
       setError('');
-      setFeedback(`Deploying a leaderboard contract to Midnight ${APP_CONFIG.oneAmNetwork}...`);
+      setFeedback(`Deploying a leaderboard contract to Midnight ${session.config.networkId}...`);
 
       const signingKey = sampleSigningKey();
       const deployTxData = await createUnprovenDeployTx(
@@ -355,7 +368,7 @@ export function useLeaderboard({
       setEntryCount(0);
       setLastTxId(txId ?? '');
       setVerifiedEntryIds(new Set());
-      writeStoredLeaderboardContractAddress(nextContractAddress);
+      writeStoredLeaderboardContractAddress(nextContractAddress, session.config.networkId);
       setFeedback('Leaderboard deployment submitted. Loading indexed state...');
       debugLog('leaderboard', 'deploy:submitted', {
         contractAddress: nextContractAddress,
@@ -367,7 +380,7 @@ export function useLeaderboard({
         setFeedback('Leaderboard deployed and ready for scores.');
       } else {
         setFeedback(
-          `Deployment was submitted, but the ${APP_CONFIG.oneAmNetwork} indexer has not exposed the leaderboard yet. Use Refresh after the wallet transaction finishes.`,
+          `Deployment was submitted, but the ${session.config.networkId} indexer has not exposed the leaderboard yet. Use Refresh after the wallet transaction finishes.`,
         );
         setError('Indexed leaderboard state is still unavailable. The submitted contract address was kept for refresh.');
       }
@@ -391,7 +404,7 @@ export function useLeaderboard({
     setEntries([]);
     setEntryCount(0);
     setVerifiedEntryIds(new Set());
-    writeStoredLeaderboardContractAddress(nextContractAddress);
+    writeStoredLeaderboardContractAddress(nextContractAddress, session?.config.networkId);
     setJoinInput('');
     setError('');
     setFeedback('Leaderboard contract loaded. Refreshing indexed scores...');
@@ -402,7 +415,7 @@ export function useLeaderboard({
   };
 
   const clearSavedContract = () => {
-    writeStoredLeaderboardContractAddress('');
+    writeStoredLeaderboardContractAddress('', session?.config.networkId);
     setContractAddress('');
     setJoinInput('');
     setContractSnapshot(null);
@@ -637,5 +650,6 @@ export function useLeaderboard({
     submitScore,
     verifyEntry,
     clearDebugEntries,
+    storageKey: leaderboardContractAddressStorageKey(session?.config.networkId),
   };
 }

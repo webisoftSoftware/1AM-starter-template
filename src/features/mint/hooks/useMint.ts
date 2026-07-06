@@ -10,9 +10,8 @@ import { debugError, debugLog, subscribeDebugLogs, type DebugEntry } from '../..
 import { createMintProviders, type MintProviders } from '../../../midnight';
 import { getAvailableShieldedMintToken, type OneAmSession } from '../../../oneAm';
 import { compiledShieldedMintContract, mintLedger } from '../../../mintContract';
-import { APP_CONFIG } from '../../../config';
 import {
-  MINT_CONTRACT_ADDRESS_STORAGE_KEY,
+  mintContractAddressStorageKey,
   readStoredContractAddress,
   writeStoredContractAddress,
 } from '../data/mintStorage';
@@ -45,7 +44,7 @@ function randomNonce(): Uint8Array {
 export function useMint({ oneAmSession, walletStatus, statusText, connectWallet }: UseMintOptions) {
   const [session, setSession] = useState<MintSession | null>(null);
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
-  const [contractAddress, setContractAddress] = useState(() => readStoredContractAddress());
+  const [contractAddress, setContractAddress] = useState('');
   const [contractSnapshot, setContractSnapshot] = useState<ContractSnapshot | null>(null);
   const [ledgerView, setLedgerView] = useState<LedgerView | null>(null);
   const [amount, setAmount] = useState('100');
@@ -71,6 +70,7 @@ export function useMint({ oneAmSession, walletStatus, statusText, connectWallet 
 
     if (!oneAmSession) {
       setSession(null);
+      setContractAddress('');
       setAvailableMintTokenAtomic(null);
       setMintTokenBalanceStatus('idle');
       setMintTokenBalanceError('');
@@ -92,10 +92,6 @@ export function useMint({ oneAmSession, walletStatus, statusText, connectWallet 
         const nextSession = { ...oneAmSession, providers };
         setSession(nextSession);
         setFeedback('Wallet connected. Deploy the mint contract once, then mint shielded tokens to your wallet.');
-
-        if (contractAddress) {
-          await refreshLedger(nextSession, contractAddress, { showBusyState: false });
-        }
       } catch (providerError) {
         debugError('mint', 'providers:init:error', providerError);
         if (!cancelled) {
@@ -117,6 +113,21 @@ export function useMint({ oneAmSession, walletStatus, statusText, connectWallet 
   }, [oneAmSession]);
 
   const isConnected = session !== null;
+
+  useEffect(() => {
+    const storedAddress = session ? readStoredContractAddress(session.config.networkId) : '';
+    setContractAddress(storedAddress);
+    setContractSnapshot(null);
+    setLedgerView(null);
+    setLastTxId('');
+    setAvailableMintTokenAtomic(null);
+    setMintTokenBalanceStatus('idle');
+    setMintTokenBalanceError('');
+
+    if (session && storedAddress) {
+      void refreshLedger(session, storedAddress, { showBusyState: false });
+    }
+  }, [session]);
 
   const refreshMintTokenBalance = useCallback(async () => {
     if (!session || !contractAddress) {
@@ -181,7 +192,7 @@ export function useMint({ oneAmSession, walletStatus, statusText, connectWallet 
     availableMintTokenAtomic === null ? null : `${availableMintTokenAtomic.toLocaleString('en-US')} tokens`;
 
   const clearContractState = (feedbackMessage: string) => {
-    writeStoredContractAddress('');
+    writeStoredContractAddress('', session?.config.networkId);
     setContractAddress('');
     setContractSnapshot(null);
     setLedgerView(null);
@@ -270,7 +281,7 @@ export function useMint({ oneAmSession, walletStatus, statusText, connectWallet 
       debugLog('app', 'deployMintContract:start');
       setBusyAction('deploy');
       setError('');
-      setFeedback(`Deploying the shielded mint contract to Midnight ${APP_CONFIG.oneAmNetwork}...`);
+      setFeedback(`Deploying the shielded mint contract to Midnight ${session.config.networkId}...`);
 
       const deployTxData = await createUnprovenDeployTx(
         {
@@ -305,7 +316,7 @@ export function useMint({ oneAmSession, walletStatus, statusText, connectWallet 
       setContractSnapshot(null);
       setLedgerView(null);
       setLastTxId(txId);
-      writeStoredContractAddress(nextContractAddress);
+      writeStoredContractAddress(nextContractAddress, session.config.networkId);
       setFeedback('Contract deployment submitted. Loading the indexed mint ledger...');
 
       const hydrated = await waitForContractSnapshot(session, nextContractAddress);
@@ -313,7 +324,7 @@ export function useMint({ oneAmSession, walletStatus, statusText, connectWallet 
         setFeedback('Mint contract deployed and indexed. Enter an amount and mint shielded tokens.');
       } else {
         clearContractState(
-          `The new contract address never appeared in the ${APP_CONFIG.oneAmNetwork} indexer. Try deploying again.`,
+          `The new contract address never appeared in the ${session.config.networkId} indexer. Try deploying again.`,
         );
         setError('Deployment did not produce indexed public state, so the provisional contract address was cleared.');
       }
@@ -437,6 +448,6 @@ export function useMint({ oneAmSession, walletStatus, statusText, connectWallet 
     refreshMintTokenBalance,
     clearSavedContract,
     clearDebugEntries,
-    storageKey: MINT_CONTRACT_ADDRESS_STORAGE_KEY,
+    storageKey: mintContractAddressStorageKey(session?.config.networkId),
   };
 }

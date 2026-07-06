@@ -1,13 +1,24 @@
+import { storageKeyForNetwork } from '../../../config';
+
 export const MINT_CONTRACT_ADDRESS_STORAGE_KEY = 'shielded-mint-contract-address';
 
-export function readStoredContractAddress(): string {
-  return window.localStorage.getItem(MINT_CONTRACT_ADDRESS_STORAGE_KEY) ?? '';
+export function mintContractAddressStorageKey(networkId: string | undefined): string {
+  return storageKeyForNetwork(MINT_CONTRACT_ADDRESS_STORAGE_KEY, networkId);
 }
 
-export function writeStoredContractAddress(value: string): void {
+export function readStoredContractAddress(networkId: string | undefined): string {
+  return (
+    window.localStorage.getItem(mintContractAddressStorageKey(networkId)) ??
+    (networkId === 'preview' ? window.localStorage.getItem(MINT_CONTRACT_ADDRESS_STORAGE_KEY) : null) ??
+    ''
+  );
+}
+
+export function writeStoredContractAddress(value: string, networkId: string | undefined): void {
+  const storageKey = mintContractAddressStorageKey(networkId);
   if (value) {
-    window.localStorage.setItem(MINT_CONTRACT_ADDRESS_STORAGE_KEY, value);
+    window.localStorage.setItem(storageKey, value);
   } else {
-    window.localStorage.removeItem(MINT_CONTRACT_ADDRESS_STORAGE_KEY);
+    window.localStorage.removeItem(storageKey);
   }
 }

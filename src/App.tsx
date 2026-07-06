@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { APP_CONFIG } from './config';
+import { APP_CONFIG, oneAmNetworkLabel } from './config';
 import { debugError, debugLog } from './debug';
 import TaskBoardPage from './features/tasks/ui/TaskBoardPage';
 import LeaderboardPage from './features/leaderboard/ui/LeaderboardPage';
@@ -82,7 +82,7 @@ function App() {
     }
 
     try {
-      debugLog('workspace', 'connect:start', { network: APP_CONFIG.oneAmNetwork });
+      debugLog('workspace', 'connect:start', { networkPreference: APP_CONFIG.oneAmNetwork });
       setIsConnecting(true);
       setConnectionError('');
       const connectedSession = await connectOneAm(APP_CONFIG.oneAmNetwork);
@@ -114,7 +114,7 @@ function App() {
           <div className="brand-intro">
             <img className="brand-logo" src={BRAND_LOGO_SRC} alt="1AM" />
             <div>
-              <p className="eyebrow">{APP_CONFIG.oneAmNetwork} network</p>
+              <p className="eyebrow">{oneAmNetworkLabel(session?.config.networkId ?? APP_CONFIG.oneAmNetwork)}</p>
               <h1>1AM dApp Workspace</h1>
               <p className="lead">Try the task board, leaderboard, shielded mint, shielded deposit, and NIGHT transfer examples from one connected session.</p>
             </div>
