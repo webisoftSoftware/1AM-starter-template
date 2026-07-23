@@ -110,26 +110,59 @@ function toBigIntBalances(entries: Array<{ tokenType: string; amount: string }>)
   return entries.map((entry) => ({ tokenType: entry.tokenType, balance: BigInt(entry.amount) }));
 }
 
+const RATE_LIMIT_MAX_RETRIES = 5;
+const RATE_LIMIT_BASE_DELAY_MS = 1000;
+
+function parseRetryAfterMs(header: string | null): number | null {
+  if (!header) {
+    return null;
+  }
+  const seconds = Number(header);
+  if (Number.isFinite(seconds)) {
+    return Math.max(0, seconds * 1000);
+  }
+  const dateMs = Date.parse(header);
+  return Number.isFinite(dateMs) ? Math.max(0, dateMs - Date.now()) : null;
+}
+
 async function queryLatestContractAction(
   queryUrl: string,
   query: string,
   address: string,
 ): Promise<LatestContractAction | null> {
   debugLog('indexer', 'queryLatestContractAction:start', { query, address });
-  const response = await fetch(queryUrl, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      query,
-      variables: { address },
-    }),
-  });
 
-  if (!response.ok) {
-    debugError('indexer', 'queryLatestContractAction:http-error', { status: response.status, query, address });
-    throw new Error(`Indexer query failed with status ${response.status}.`);
+  let response: Response | undefined;
+  for (let attempt = 0; attempt <= RATE_LIMIT_MAX_RETRIES; attempt += 1) {
+    response = await fetch(queryUrl, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        query,
+        variables: { address },
+      }),
+    });
+
+    // The indexer rate-limits polling (common while waiting for a freshly
+    // deployed contract to settle). Back off and retry rather than surfacing
+    // a spurious error.
+    if (response.status === 429 && attempt < RATE_LIMIT_MAX_RETRIES) {
+      const retryAfterMs = parseRetryAfterMs(response.headers.get('retry-after'));
+      const backoffMs = retryAfterMs ?? RATE_LIMIT_BASE_DELAY_MS * 2 ** attempt;
+      debugLog('indexer', 'queryLatestContractAction:rate-limited', { address, attempt, backoffMs });
+      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+      continue;
+    }
+
+    break;
+  }
+
+  if (!response || !response.ok) {
+    const status = response?.status ?? 0;
+    debugError('indexer', 'queryLatestContractAction:http-error', { status, query, address });
+    throw new Error(`Indexer query failed with status ${status}.`);
   }
 
   const payload = (await response.json()) as GraphQlResponse<{ contractAction: LatestContractAction | null }>;
@@ -321,6 +354,45 @@ function createPatchedPublicDataProvider(queryUrl: string, subscriptionUrl: stri
       }
     },
   };
+}
+
+/**
+ * Waits for a freshly submitted deployment to settle on-chain using the
+ * indexer's websocket subscription (`watchForDeployTxData`) instead of polling
+ * the GraphQL endpoint. This avoids the rate-limiting (HTTP 429) that repeated
+ * polling triggers while a contract settles.
+ *
+ * `watchForDeployTxData` waits indefinitely by contract, so we race it against
+ * a timeout to keep the UI responsive. Resolves `true` when the deploy is
+ * observed, `false` on timeout (callers can then fall back to a manual query).
+ */
+export async function waitForDeploySettled(
+  publicDataProvider: PublicDataProvider,
+  contractAddress: string,
+  timeoutMs = 60_000,
+): Promise<boolean> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<false>((resolve) => {
+    timeoutHandle = setTimeout(() => resolve(false), timeoutMs);
+  });
+
+  try {
+    debugLog('publicDataProvider', 'waitForDeploySettled:start', { contractAddress, timeoutMs });
+    const settled = await Promise.race([
+      publicDataProvider.watchForDeployTxData(contractAddress).then(() => true as const),
+      timeout,
+    ]);
+    debugLog('publicDataProvider', 'waitForDeploySettled:result', { contractAddress, settled });
+    return settled;
+  } catch (error) {
+    // A subscription error is non-fatal — the caller falls back to a query.
+    debugError('publicDataProvider', 'waitForDeploySettled:error', error);
+    return false;
+  } finally {
+    if (timeoutHandle !== undefined) {
+      clearTimeout(timeoutHandle);
+    }
+  }
 }
 
 function createPrivateStateProvider<

@@ -14,7 +14,7 @@ import {
   LEADERBOARD_PRIVATE_STATE_ID,
   setLeaderboardCustomName,
 } from '../../../leaderboardContract';
-import { createLeaderboardProviders, type LeaderboardProviders } from '../../../midnight';
+import { createLeaderboardProviders, waitForDeploySettled, type LeaderboardProviders } from '../../../midnight';
 import type { OneAmSession } from '../../../oneAm';
 import {
   leaderboardContractAddressStorageKey,
@@ -289,15 +289,19 @@ export function useLeaderboard({
       });
       return true;
     } catch (refreshError) {
-      debugError('leaderboard', 'refresh:error', refreshError);
       if (isMissingPublicStateError(refreshError)) {
+        // Expected while a freshly deployed contract is still settling on the
+        // indexer. Log at debug level only and don't surface it as an error.
+        debugLog('leaderboard', 'refresh:missing-public-state', { activeContractAddress });
         if (treatMissingAsTransient) {
           return false;
         }
 
         setFeedback('No indexed leaderboard state was found for this address. Wait for deployment or load another contract.');
+        return false;
       }
 
+      debugError('leaderboard', 'refresh:error', refreshError);
       setError(friendlyError(refreshError));
       return false;
     } finally {
@@ -308,21 +312,16 @@ export function useLeaderboard({
   };
 
   const waitForLeaderboardSnapshot = async (activeSession: LeaderboardSession, activeContractAddress: string) => {
-    for (let attempt = 1; attempt <= 30; attempt += 1) {
-      debugLog('leaderboard', 'waitForSnapshot:attempt', { activeContractAddress, attempt });
-      if (
-        await refreshLeaderboard(activeSession, activeContractAddress, {
-          showBusyState: false,
-          treatMissingAsTransient: true,
-        })
-      ) {
-        return true;
-      }
+    // Wait for the deploy to settle via the indexer websocket subscription
+    // instead of polling the GraphQL endpoint (which triggers rate limits).
+    debugLog('leaderboard', 'waitForSnapshot:watch-start', { activeContractAddress });
+    await waitForDeploySettled(activeSession.providers.publicDataProvider, activeContractAddress);
 
-      await new Promise((resolve) => window.setTimeout(resolve, 2000));
-    }
-
-    return false;
+    // Whether the watch resolved or timed out, do a single query to load state.
+    return refreshLeaderboard(activeSession, activeContractAddress, {
+      showBusyState: false,
+      treatMissingAsTransient: true,
+    });
   };
 
   const deployLeaderboardContract = async () => {

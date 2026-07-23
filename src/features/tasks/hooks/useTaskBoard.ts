@@ -7,7 +7,7 @@ import {
 } from '@midnight-ntwrk/midnight-js-contracts';
 import { ChargedState, ContractState as CompactContractState, sampleSigningKey } from '@midnight-ntwrk/compact-runtime';
 import { debugError, debugLog, subscribeDebugLogs, type DebugEntry } from '../../../debug';
-import { createTodoProviders, type TodoProvidersByMode } from '../../../midnight';
+import { createTodoProviders, waitForDeploySettled, type TodoProvidersByMode } from '../../../midnight';
 import type { OneAmSession } from '../../../oneAm';
 import { decryptTodoPayload, encryptTodoPayload, isEncryptedTodoPayload } from '../../../confidentialTodo';
 import { compiledTodoContract, todoLedger } from '../../../todoContract';
@@ -47,6 +47,10 @@ type UseTaskBoardOptions = {
 
 function isMissingPublicStateError(error: unknown): boolean {
   return error instanceof Error && error.message.includes('No public state found at contract address');
+}
+
+function isRateLimitError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes('status 429');
 }
 
 export function useTaskBoard({ oneAmSession, walletStatus, statusText, connectWallet }: UseTaskBoardOptions) {
@@ -289,14 +293,30 @@ export function useTaskBoard({ oneAmSession, walletStatus, statusText, connectWa
       });
       return true;
     } catch (refreshError) {
-      debugError('app', 'refreshTasks:error', refreshError);
       if (isMissingPublicStateError(refreshError)) {
+        // Expected while a freshly deployed contract is still settling on the
+        // indexer. Log at debug level only and don't surface it as an error.
+        debugLog('app', 'refreshTasks:missing-public-state', { activeContractAddress });
         if (treatMissingAsTransient) {
           return false;
         }
 
         setFeedback('No indexed contract state was found for this address. If deployment is still pending, wait and refresh again; otherwise clear the saved address and deploy a fresh contract.');
+        return false;
       }
+
+      if (isRateLimitError(refreshError)) {
+        // The indexer is rate-limiting us (common while polling for a settling
+        // contract). Don't surface it as a hard error during transient polls.
+        debugLog('app', 'refreshTasks:rate-limited', { activeContractAddress });
+        if (treatMissingAsTransient) {
+          return false;
+        }
+        setFeedback('The indexer is rate-limiting requests. Please wait a moment and try again.');
+        return false;
+      }
+
+      debugError('app', 'refreshTasks:error', refreshError);
 
       setError(
         refreshError instanceof Error ? refreshError.message : 'Unable to fetch the latest task list from the blockchain.',
@@ -310,22 +330,17 @@ export function useTaskBoard({ oneAmSession, walletStatus, statusText, connectWa
   };
 
   const waitForContractSnapshot = async (activeSession: TaskContractSession, activeContractAddress: string) => {
-    for (let attempt = 1; attempt <= 30; attempt += 1) {
-      debugLog('app', 'waitForContractSnapshot:attempt', { activeContractAddress, attempt });
+    // Use the indexer websocket subscription to wait for the deploy to settle
+    // rather than polling the GraphQL endpoint (which triggers rate limits).
+    const providers = activeSession.providersByMode[privacyMode];
+    debugLog('app', 'waitForContractSnapshot:watch-start', { activeContractAddress });
+    await waitForDeploySettled(providers.publicDataProvider, activeContractAddress);
 
-      if (
-        await refreshTasks(activeSession, activeContractAddress, {
-          showBusyState: false,
-          treatMissingAsTransient: true,
-        })
-      ) {
-        return true;
-      }
-
-      await new Promise((resolve) => window.setTimeout(resolve, 2000));
-    }
-
-    return false;
+    // Whether the watch resolved or timed out, do a single query to load state.
+    return refreshTasks(activeSession, activeContractAddress, {
+      showBusyState: false,
+      treatMissingAsTransient: true,
+    });
   };
 
   const deployTaskContract = async () => {

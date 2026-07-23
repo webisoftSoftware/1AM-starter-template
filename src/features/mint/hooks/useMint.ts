@@ -7,7 +7,7 @@ import {
 } from '@midnight-ntwrk/midnight-js-contracts';
 import { sampleSigningKey } from '@midnight-ntwrk/compact-runtime';
 import { debugError, debugLog, subscribeDebugLogs, type DebugEntry } from '../../../debug';
-import { createMintProviders, type MintProviders } from '../../../midnight';
+import { createMintProviders, waitForDeploySettled, type MintProviders } from '../../../midnight';
 import { getAvailableShieldedMintToken, type OneAmSession } from '../../../oneAm';
 import { compiledShieldedMintContract, mintLedger } from '../../../mintContract';
 import {
@@ -235,14 +235,18 @@ export function useMint({ oneAmSession, walletStatus, statusText, connectWallet 
       });
       return true;
     } catch (refreshError) {
-      debugError('app', 'refreshLedger:error', refreshError);
       if (isMissingPublicStateError(refreshError)) {
+        // Expected while a freshly deployed contract is still settling on the
+        // indexer. Log at debug level only and don't surface it as an error.
+        debugLog('app', 'refreshLedger:missing-public-state', { activeContractAddress });
         if (treatMissingAsTransient) {
           return false;
         }
         clearContractState('No indexed contract state was found for the saved address. Deploy a fresh contract to continue.');
+        return false;
       }
 
+      debugError('app', 'refreshLedger:error', refreshError);
       setError(
         refreshError instanceof Error ? refreshError.message : 'Unable to fetch the latest mint ledger from the blockchain.',
       );
@@ -255,20 +259,16 @@ export function useMint({ oneAmSession, walletStatus, statusText, connectWallet 
   };
 
   const waitForContractSnapshot = async (activeSession: MintSession, activeContractAddress: string) => {
-    for (let attempt = 1; attempt <= 30; attempt += 1) {
-      debugLog('app', 'waitForContractSnapshot:attempt', { activeContractAddress, attempt });
+    // Wait for the deploy to settle via the indexer websocket subscription
+    // instead of polling the GraphQL endpoint (which triggers rate limits).
+    debugLog('app', 'waitForContractSnapshot:watch-start', { activeContractAddress });
+    await waitForDeploySettled(activeSession.providers.publicDataProvider, activeContractAddress);
 
-      if (await refreshLedger(activeSession, activeContractAddress, {
-        showBusyState: false,
-        treatMissingAsTransient: true,
-      })) {
-        return true;
-      }
-
-      await new Promise((resolve) => window.setTimeout(resolve, 2000));
-    }
-
-    return false;
+    // Whether the watch resolved or timed out, do a single query to load state.
+    return refreshLedger(activeSession, activeContractAddress, {
+      showBusyState: false,
+      treatMissingAsTransient: true,
+    });
   };
 
   const deployMintContract = async () => {

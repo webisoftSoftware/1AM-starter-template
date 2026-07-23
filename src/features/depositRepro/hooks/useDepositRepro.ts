@@ -24,6 +24,7 @@ import { debugError, debugLog, stringifyDebugValue, subscribeDebugLogs, type Deb
 import {
   createDepositOnlyProviders,
   createMintDepositProviders,
+  waitForDeploySettled,
   type DepositOnlyProviders,
   type MintDepositProviders,
 } from '../../../midnight';
@@ -474,12 +475,18 @@ export function useDepositRepro({
       });
       return true;
     } catch (refreshError) {
-      debugError('depositRepro', 'mintDeposit:refresh:error', {
-        ...baseContext('mintDepositRefresh'),
-        error: refreshError,
-      });
-      if (isMissingPublicStateError(refreshError) && treatMissingAsTransient) {
-        return false;
+      if (isMissingPublicStateError(refreshError)) {
+        // Expected while a freshly deployed contract is still settling on the
+        // indexer. Log at debug level only and don't surface it as an error.
+        debugLog('depositRepro', 'mintDeposit:refresh:missing-public-state', baseContext('mintDepositRefresh'));
+        if (treatMissingAsTransient) {
+          return false;
+        }
+      } else {
+        debugError('depositRepro', 'mintDeposit:refresh:error', {
+          ...baseContext('mintDepositRefresh'),
+          error: refreshError,
+        });
       }
       setError(refreshError instanceof Error ? refreshError.message : 'Unable to fetch mint+deposit ledger.');
       return false;
@@ -527,12 +534,18 @@ export function useDepositRepro({
       });
       return true;
     } catch (refreshError) {
-      debugError('depositRepro', 'depositOnly:refresh:error', {
-        ...baseContext('depositOnlyRefresh'),
-        error: refreshError,
-      });
-      if (isMissingPublicStateError(refreshError) && treatMissingAsTransient) {
-        return false;
+      if (isMissingPublicStateError(refreshError)) {
+        // Expected while a freshly deployed contract is still settling on the
+        // indexer. Log at debug level only and don't surface it as an error.
+        debugLog('depositRepro', 'depositOnly:refresh:missing-public-state', baseContext('depositOnlyRefresh'));
+        if (treatMissingAsTransient) {
+          return false;
+        }
+      } else {
+        debugError('depositRepro', 'depositOnly:refresh:error', {
+          ...baseContext('depositOnlyRefresh'),
+          error: refreshError,
+        });
       }
       setError(refreshError instanceof Error ? refreshError.message : 'Unable to fetch deposit-only ledger.');
       return false;
@@ -544,47 +557,31 @@ export function useDepositRepro({
   };
 
   const waitForMintDepositSnapshot = async (activeSession: DepositReproSession, activeContractAddress: string) => {
-    for (let attempt = 1; attempt <= 30; attempt += 1) {
-      debugLog('depositRepro', 'mintDeposit:waitForSnapshot:attempt', {
-        ...baseContext('waitMintDepositSnapshot', { mintContractAddress: activeContractAddress }),
-        attempt: String(attempt),
-      });
+    // Wait for the deploy to settle via the indexer websocket subscription
+    // instead of polling the GraphQL endpoint (which triggers rate limits).
+    debugLog('depositRepro', 'mintDeposit:waitForSnapshot:watch-start',
+      baseContext('waitMintDepositSnapshot', { mintContractAddress: activeContractAddress }));
+    await waitForDeploySettled(activeSession.mintDepositProviders.publicDataProvider, activeContractAddress);
 
-      if (
-        await refreshMintDeposit(activeSession, activeContractAddress, {
-          showBusyState: false,
-          treatMissingAsTransient: true,
-        })
-      ) {
-        return true;
-      }
-
-      await new Promise((resolve) => window.setTimeout(resolve, 2000));
-    }
-
-    return false;
+    // Whether the watch resolved or timed out, do a single query to load state.
+    return refreshMintDeposit(activeSession, activeContractAddress, {
+      showBusyState: false,
+      treatMissingAsTransient: true,
+    });
   };
 
   const waitForDepositOnlySnapshot = async (activeSession: DepositReproSession, activeContractAddress: string) => {
-    for (let attempt = 1; attempt <= 30; attempt += 1) {
-      debugLog('depositRepro', 'depositOnly:waitForSnapshot:attempt', {
-        ...baseContext('waitDepositOnlySnapshot', { depositOnlyContractAddress: activeContractAddress }),
-        attempt: String(attempt),
-      });
+    // Wait for the deploy to settle via the indexer websocket subscription
+    // instead of polling the GraphQL endpoint (which triggers rate limits).
+    debugLog('depositRepro', 'depositOnly:waitForSnapshot:watch-start',
+      baseContext('waitDepositOnlySnapshot', { depositOnlyContractAddress: activeContractAddress }));
+    await waitForDeploySettled(activeSession.depositOnlyProviders.publicDataProvider, activeContractAddress);
 
-      if (
-        await refreshDepositOnly(activeSession, activeContractAddress, {
-          showBusyState: false,
-          treatMissingAsTransient: true,
-        })
-      ) {
-        return true;
-      }
-
-      await new Promise((resolve) => window.setTimeout(resolve, 2000));
-    }
-
-    return false;
+    // Whether the watch resolved or timed out, do a single query to load state.
+    return refreshDepositOnly(activeSession, activeContractAddress, {
+      showBusyState: false,
+      treatMissingAsTransient: true,
+    });
   };
 
   const deployMintDepositContract = async () => {
