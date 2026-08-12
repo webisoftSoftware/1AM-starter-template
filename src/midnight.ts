@@ -567,35 +567,10 @@ function isZkArtifactUrl(url: string): boolean {
   );
 }
 
-async function createNonceSafeProofProvider<K extends string>(
+async function createSystemAwareProofProvider<K extends string>(
   session: OneAmSession,
   zkConfigProvider: ZKConfigProvider<K>,
 ): Promise<ReturnType<typeof createProofProvider>> {
-  const nonceSeparator = '#nonce=';
-  const stripNonce = (keyLocation: string) => {
-    const index = keyLocation.indexOf(nonceSeparator);
-    return index === -1 ? keyLocation : keyLocation.slice(0, index);
-  };
-  const tagNonce = (keyLocation: string) => `${keyLocation}${nonceSeparator}${crypto.randomUUID()}`;
-
-  class NonceStrippingZkConfigProvider extends ZKConfigProvider<string> {
-    constructor(private readonly inner: ZKConfigProvider<string>) {
-      super();
-    }
-
-    getProverKey(circuitId: string) {
-      return this.inner.getProverKey(stripNonce(circuitId));
-    }
-
-    getVerifierKey(circuitId: string) {
-      return this.inner.getVerifierKey(stripNonce(circuitId));
-    }
-
-    getZKIR(circuitId: string) {
-      return this.inner.getZKIR(stripNonce(circuitId));
-    }
-  }
-
   class SystemAwareZkConfigProvider extends ZKConfigProvider<string> {
     private readonly systemProvider = new FetchZkConfigProvider<string>(
       new URL(APP_CONFIG.zkMintAssetBasePath, window.location.origin).toString(),
@@ -626,15 +601,18 @@ async function createNonceSafeProofProvider<K extends string>(
   const systemAwareZkConfigProvider = new SystemAwareZkConfigProvider(
     zkConfigProvider as unknown as ZKConfigProvider<string>,
   );
-  const dedupSafeZkConfigProvider = new NonceStrippingZkConfigProvider(
-    systemAwareZkConfigProvider,
+  const baseProvingProvider = await session.api.getProvingProvider(
+    systemAwareZkConfigProvider.asKeyMaterialProvider(),
   );
-  const baseProvingProvider = await session.api.getProvingProvider(dedupSafeZkConfigProvider.asKeyMaterialProvider());
   const provingProvider: ProvingProvider = {
-    check: (serializedPreimage, keyLocation) =>
-      baseProvingProvider.check(serializedPreimage, tagNonce(keyLocation)),
-    prove: (serializedPreimage, keyLocation, overwriteBindingInput) =>
-      baseProvingProvider.prove(serializedPreimage, tagNonce(keyLocation), overwriteBindingInput),
+    check: (serializedPreimage, keyLocation) => {
+      debugLog('provingProvider', 'check', { keyLocation });
+      return baseProvingProvider.check(serializedPreimage, keyLocation);
+    },
+    prove: (serializedPreimage, keyLocation, overwriteBindingInput) => {
+      debugLog('provingProvider', 'prove', { keyLocation });
+      return baseProvingProvider.prove(serializedPreimage, keyLocation, overwriteBindingInput);
+    },
   };
 
   return createProofProvider(provingProvider);
@@ -687,7 +665,7 @@ export async function createMintProviders(session: OneAmSession): Promise<MintPr
   const zkBaseUrl = new URL(APP_CONFIG.zkMintAssetBasePath, window.location.origin).toString();
   const zkConfigProvider = new FetchZkConfigProvider<'mintShielded'>(zkBaseUrl, createLoggingFetch('mint'));
   debugLog('zkConfigProvider', 'baseURL', { zkBaseUrl });
-  const proofProvider = await createNonceSafeProofProvider(session, zkConfigProvider);
+  const proofProvider = await createSystemAwareProofProvider(session, zkConfigProvider);
 
   return {
     privateStateProvider,
@@ -712,7 +690,7 @@ export async function createMintDepositProviders(session: OneAmSession): Promise
     createLoggingFetch('mint-deposit'),
   );
   debugLog('zkConfigProvider', 'baseURL', { scope: 'mint-deposit', zkBaseUrl });
-  const proofProvider = await createNonceSafeProofProvider(session, zkConfigProvider);
+  const proofProvider = await createSystemAwareProofProvider(session, zkConfigProvider);
 
   return {
     privateStateProvider,
@@ -737,7 +715,7 @@ export async function createDepositOnlyProviders(session: OneAmSession): Promise
     createLoggingFetch('deposit-only'),
   );
   debugLog('zkConfigProvider', 'baseURL', { scope: 'deposit-only', zkBaseUrl });
-  const proofProvider = await createNonceSafeProofProvider(session, zkConfigProvider);
+  const proofProvider = await createSystemAwareProofProvider(session, zkConfigProvider);
 
   return {
     privateStateProvider,
