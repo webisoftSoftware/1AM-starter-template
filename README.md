@@ -54,7 +54,9 @@ Important API details:
 
 - `submitTransaction(txHex)` resolves when the wallet has accepted/submitted the finalized transaction; it does not return a transaction id. Derive the id from the finalized `Transaction.identifiers()` value before submitting.
 - `signData(data, { encoding, keyType: 'unshielded' })` returns `{ data, signature, verifyingKey }`. Use the `signature` field, not the whole response, when deriving local encryption keys.
-- The dApp hosts only its contract ZK artifacts: `keys/{circuit}.prover`, `keys/{circuit}.verifier`, and `zkir/{circuit}.bzkir`. It should not copy Midnight system keys or require `MIDNIGHT_SYSTEM_KEYS_DIR`; 1AM/ProofStation handles system proving and dust sponsorship.
+- The dApp hosts its contract ZK artifacts: `keys/{circuit}.prover`, `keys/{circuit}.verifier`, and `zkir/{circuit}.bzkir`.
+- Shielded flows also need Midnight's `zswap` system keys served from the dApp origin. The wallet requests `midnight/zswap/{spend,output}` through the key-material callback rather than resolving them internally, so `public/zk/shieldedMint/{keys,zkir}/midnight/` is required for any transaction that moves shielded coins. `SystemAwareZkConfigProvider` in `src/midnight.ts` routes `midnight/`-prefixed circuit ids there. Verified against a successful mint on 2026-08-12; recheck before removing, since this is wallet behavior rather than a protocol requirement.
+- `midnight/dust/*` is resolved by the wallet internally and has never been requested from the page. Dust sponsorship stays entirely on the 1AM side.
 
 See `1am.md` for a more detailed integration reference.
 
