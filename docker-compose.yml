@@ -8,6 +8,7 @@ services:
         VITE_ZK_TODO_ASSET_BASE_PATH: ${VITE_ZK_TODO_ASSET_BASE_PATH:-/zk/todo}
         VITE_ZK_SHIELDED_TODO_ASSET_BASE_PATH: ${VITE_ZK_SHIELDED_TODO_ASSET_BASE_PATH:-/zk/shieldedTodo}
         VITE_ZK_MINT_ASSET_BASE_PATH: ${VITE_ZK_MINT_ASSET_BASE_PATH:-/zk/shieldedMint}
+        VITE_ZK_PROOF_SIMULATOR_ASSET_BASE_PATH: ${VITE_ZK_PROOF_SIMULATOR_ASSET_BASE_PATH:-/zk/proofSimulator}
     container_name: dapp-example
     ports:
       - "5173:5173"

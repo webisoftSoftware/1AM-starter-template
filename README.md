@@ -34,6 +34,7 @@ Copy `.env.example` to `.env` and adjust values for your setup.
 - `VITE_1AM_NETWORK`: 1AM wallet network preference (`auto`, `preview`, or `preprod`; defaults to `auto`)
 - `VITE_ZK_TODO_ASSET_BASE_PATH`: unshielded TODO contract ZK asset path
 - `VITE_ZK_SHIELDED_TODO_ASSET_BASE_PATH`: shielded TODO contract ZK asset path
+- `VITE_ZK_PROOF_SIMULATOR_ASSET_BASE_PATH`: proof simulator asset path or absolute R2 URL
 - `DEV_ALLOWED_HOSTS`: comma-separated hostnames allowed by Vite dev server
 
 `docker compose build` uses the same `VITE_*` values as build args.
@@ -114,5 +115,47 @@ npm run validate:proof-simulator
 ```
 
 Use `npm run calibrate:proof-simulator` to validate circuit sizing without generating proving
-keys. The generator accepts `--min-k` and `--max-k` bounds between 6 and 25. Vite and Docker
-copy the managed artifacts into `public/zk/proofSimulator` during their normal prebuild step.
+keys. The generator accepts `--min-k` and `--max-k` bounds between 6 and 25. Local development
+and Docker can copy the managed artifacts into `public/zk/proofSimulator`; the production Pages
+build uses R2 as described below.
+
+### Cloudflare Pages and R2
+
+Cloudflare Pages rejects individual static files larger than 25 MiB, while the bundled high-k
+prover keys exceed that limit. Store the simulator bundle in a public R2 bucket instead. The
+other, smaller contract assets remain part of the Pages deployment.
+
+For this project, upload artifacts to the existing production bucket after authenticating
+Wrangler:
+
+```sh
+npm exec wrangler login
+npm run upload:proof-simulator:r2 -- --bucket 1am-prover-assets
+```
+
+For a new Cloudflare account, create a bucket and apply the included read-only browser CORS
+policy during the first upload:
+
+```sh
+npm run upload:proof-simulator:r2 -- \
+  --bucket 1am-proof-simulator-assets \
+  --create-bucket \
+  --apply-cors
+```
+
+For production, connect a custom domain in the R2 bucket settings (recommended) or pass
+`--domain assets.example.com --zone-id <zone-id>` to the upload command. The optional
+`--enable-dev-url` flag exposes Cloudflare's rate-limited `r2.dev` URL for testing.
+
+The checked-in `.env.production` points Vite at the existing `prover.1am.xyz` R2 custom domain.
+Keep the Cloudflare Pages build command as `npm run build` and output directory as `dist`. If
+deploying a fork, override this build-time environment variable in Pages or edit the production
+env file:
+
+```text
+VITE_ZK_PROOF_SIMULATOR_ASSET_BASE_PATH=https://prover.1am.xyz/proofSimulator
+```
+
+When this value is an absolute HTTP(S) URL, `prebuild` intentionally removes/skips the local
+proof-simulator copy. This keeps the large prover keys out of the Pages upload. Re-run the R2
+upload command whenever the generated manifest or proof artifacts change.
