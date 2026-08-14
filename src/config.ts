@@ -56,3 +56,12 @@ export const APP_CONFIG = {
     '/zk/proofSimulator',
   ),
 } as const;
+
+export const PROOF_SIMULATOR_DEFAULT_CONTRACTS: Partial<Record<OneAmNetwork, string>> = {
+  preview: '97d73064132b3e3c8b2579abeddda32fb77571b1baf81ba3f04b39a8f19cf1cf',
+  preprod: '27470e2d25fd5b90a58f6497a8ccba4d3c61d218fe4df77856d098deb67369db',
+};
+
+export function proofSimulatorDefaultContract(networkId: string | undefined): string {
+  return isOneAmNetwork(networkId) ? PROOF_SIMULATOR_DEFAULT_CONTRACTS[networkId] ?? '' : '';
+}

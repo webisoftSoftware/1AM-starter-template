@@ -1024,11 +1024,14 @@ dd {
 
 .proof-contract-card {
   display: grid;
-  gap: 0.2rem;
+  flex: 1;
+  gap: 0.35rem;
 }
 
-.proof-contract-card code {
-  overflow-wrap: anywhere;
+.proof-contract-card input {
+  width: min(42rem, 100%);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
 }
 
 .proof-ready { color: #177245 !important; }
@@ -1062,7 +1065,7 @@ dd {
 .proof-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 920px;
+  min-width: 780px;
 }
 
 .proof-table th,
@@ -1094,6 +1097,19 @@ dd {
 .proof-status-passed { background: #d9f4e5; color: #11653a; }
 .proof-status-failed { background: #ffe0dd; color: #9b2c24; }
 
+.proof-tier-experimental {
+  background: rgba(255, 241, 191, 0.22);
+}
+
+.proof-experimental {
+  display: block;
+  margin-top: 0.2rem;
+  color: #8a5b13;
+  font-size: 0.68rem;
+  font-weight: 600;
+  white-space: normal;
+}
+
 .proof-error-detail {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -1109,6 +1125,76 @@ dd {
   .proof-range-panel {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .proof-range-fields {
+    width: 100%;
+  }
+
+  .proof-range-fields label {
+    flex: 1;
+  }
+
+  .proof-range-fields select {
+    width: 100%;
+  }
+
+  .proof-table-wrap {
+    overflow: visible;
+  }
+
+  .proof-table,
+  .proof-table tbody,
+  .proof-table tr,
+  .proof-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .proof-table {
+    min-width: 0;
+  }
+
+  .proof-table thead {
+    display: none;
+  }
+
+  .proof-table tbody {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .proof-table tr {
+    border: 1px solid var(--border-color, #d9ddd9);
+    border-radius: 10px;
+    padding: 0.35rem 0.7rem;
+    background: rgba(255, 255, 255, 0.55);
+  }
+
+  .proof-table tr.proof-tier-experimental {
+    background: rgba(255, 241, 191, 0.22);
+  }
+
+  .proof-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.48rem 0;
+    white-space: normal;
+  }
+
+  .proof-table td::before {
+    content: attr(data-label);
+    color: var(--muted-text, #5d625f);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .proof-table td:first-child {
+    align-items: flex-start;
   }
 }
 

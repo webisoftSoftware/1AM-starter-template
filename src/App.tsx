@@ -23,7 +23,7 @@ const WORKSPACE_TABS: Array<{ id: WorkspaceTab; label: string; description: stri
   { id: 'mint', label: 'Shielded Mint', description: 'Mint private wallet tokens' },
   { id: 'depositRepro', label: 'Shielded Deposit', description: 'Mint then deposit tokens' },
   { id: 'transfer', label: 'NIGHT Transfer', description: 'Send unshielded NIGHT' },
-  { id: 'proofSimulator', label: 'Proof Simulator', description: 'Probe ProofStation k tiers' },
+  { id: 'proofSimulator', label: 'Proof Simulator', description: 'Test Compact proof tiers' },
 ];
 
 function shorten(value: string, head = 14, tail = 8): string {

@@ -6,7 +6,7 @@ import {
   getPublicStates,
   submitTxAsync,
 } from '@midnight-ntwrk/midnight-js-contracts';
-import { APP_CONFIG } from '../../../config';
+import { APP_CONFIG, proofSimulatorDefaultContract } from '../../../config';
 import { debugError, debugLog } from '../../../debug';
 import {
   createProofSimulatorProviders,
@@ -68,13 +68,14 @@ export function useProofSimulator({
   const [session, setSession] = useState<ProofSimulatorSession | null>(null);
   const [manifest, setManifest] = useState<ProofSimulatorManifest | null>(null);
   const [contractAddress, setContractAddress] = useState('');
+  const [addressInput, setAddressInput] = useState('');
   const [snapshotReady, setSnapshotReady] = useState(false);
   const [busyAction, setBusyAction] = useState<'connect' | 'deploy' | 'refresh' | 'run' | null>(null);
-  const [feedback, setFeedback] = useState('Connect 1AM to deploy the proof harness.');
+  const [feedback, setFeedback] = useState('Connect 1AM to load the harness.');
   const [error, setError] = useState('');
   const [results, setResults] = useState<Record<string, ProofRunResult>>({});
   const [rangeStart, setRangeStart] = useState(6);
-  const [rangeEnd, setRangeEnd] = useState(20);
+  const [rangeEnd, setRangeEnd] = useState(17);
   const [copyFeedback, setCopyFeedback] = useState('');
   const stopRequested = useRef(false);
 
@@ -90,7 +91,7 @@ export function useProofSimulator({
         if (cancelled) return;
         setManifest(nextManifest);
         setRangeStart(nextManifest.minK);
-        setRangeEnd(nextManifest.maxK);
+        setRangeEnd(Math.min(17, nextManifest.maxK));
       } catch (manifestError) {
         if (!cancelled) setError(`Unable to load proof simulator artifacts: ${errorMessage(manifestError)}`);
       }
@@ -110,7 +111,7 @@ export function useProofSimulator({
       await getPublicStates(activeSession.providers.publicDataProvider, activeAddress);
       setSnapshotReady(true);
       setError('');
-      setFeedback('Proof harness state loaded. Select one k or a range to prove.');
+      setFeedback('Harness ready.');
       return true;
     } catch (refreshError) {
       setSnapshotReady(false);
@@ -135,12 +136,15 @@ export function useProofSimulator({
         const providers = await createProofSimulatorProviders(oneAmSession);
         if (cancelled) return;
         const nextSession = { ...oneAmSession, providers };
+        const defaultAddress = proofSimulatorDefaultContract(oneAmSession.config.networkId);
         const storedAddress = readProofSimulatorContractAddress(oneAmSession.config.networkId);
+        const initialAddress = storedAddress || defaultAddress;
         setSession(nextSession);
-        setContractAddress(storedAddress);
+        setContractAddress(initialAddress);
+        setAddressInput(initialAddress);
         setSnapshotReady(false);
-        setFeedback(storedAddress ? 'Loading the saved proof harness...' : 'Wallet connected. Deploy the proof harness once.');
-        if (storedAddress) void refreshSnapshot(nextSession, storedAddress, false);
+        setFeedback(initialAddress ? 'Loading harness...' : 'Enter a harness address or deploy one.');
+        if (initialAddress) void refreshSnapshot(nextSession, initialAddress, false);
       } catch (providerError) {
         if (!cancelled) setError(errorMessage(providerError));
       } finally {
@@ -174,6 +178,7 @@ export function useProofSimulator({
       await session.providers.privateStateProvider.setSigningKey(nextAddress, deployTxData.private.signingKey);
       writeProofSimulatorContractAddress(nextAddress, session.config.networkId);
       setContractAddress(nextAddress);
+      setAddressInput(nextAddress);
       setSnapshotReady(false);
       setFeedback(`Deployment submitted${txId ? ` (${txId})` : ''}. Waiting for indexed state...`);
       await waitForDeploySettled(session.providers.publicDataProvider, nextAddress);
@@ -245,13 +250,36 @@ export function useProofSimulator({
     [manifest, rangeEnd, rangeStart],
   );
 
-  const clearContract = () => {
-    writeProofSimulatorContractAddress('', session?.config.networkId);
-    setContractAddress('');
+  const updateAddressInput = (value: string) => {
+    setAddressInput(value.trim());
+    if (value.trim() !== contractAddress) setSnapshotReady(false);
+  };
+
+  const loadAddress = async () => {
+    if (!session) return false;
+    const nextAddress = addressInput.trim().toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(nextAddress)) {
+      setError('Enter a 64-character contract address.');
+      return false;
+    }
+    writeProofSimulatorContractAddress(nextAddress, session.config.networkId);
+    setContractAddress(nextAddress);
+    setAddressInput(nextAddress);
+    setResults({});
+    return refreshSnapshot(session, nextAddress);
+  };
+
+  const useDefaultContract = async () => {
+    if (!session) return false;
+    const defaultAddress = proofSimulatorDefaultContract(session.config.networkId);
+    if (!defaultAddress) return false;
+    writeProofSimulatorContractAddress('', session.config.networkId);
+    setContractAddress(defaultAddress);
+    setAddressInput(defaultAddress);
     setSnapshotReady(false);
     setResults({});
-    setFeedback('Saved proof harness cleared. Deploy a new one to continue.');
     setError('');
+    return refreshSnapshot(session, defaultAddress);
   };
 
   const copyResults = async () => {
@@ -279,6 +307,8 @@ export function useProofSimulator({
     session,
     manifest,
     contractAddress,
+    addressInput,
+    defaultContractAddress: proofSimulatorDefaultContract(session?.config.networkId),
     snapshotReady,
     busyAction,
     feedback,
@@ -291,8 +321,10 @@ export function useProofSimulator({
     selectedCircuits,
     copyFeedback,
     deploy,
+    setAddressInput: updateAddressInput,
+    loadAddress,
+    useDefaultContract,
     refresh: () => session && contractAddress ? refreshSnapshot(session, contractAddress) : Promise.resolve(false),
-    clearContract,
     runSelected: () => runCircuits(selectedCircuits),
     runOne: (circuit: ProofCircuitManifest) => runCircuits([circuit]),
     requestStop: () => { stopRequested.current = true; },

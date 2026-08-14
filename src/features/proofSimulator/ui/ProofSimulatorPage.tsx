@@ -22,10 +22,6 @@ function formatDuration(milliseconds: number | undefined): string {
   return `${(milliseconds / 1000).toFixed(2)} s`;
 }
 
-function shortAddress(value: string): string {
-  return value ? `${value.slice(0, 16)}...${value.slice(-10)}` : 'Not deployed';
-}
-
 export default function ProofSimulatorPage(props: ProofSimulatorPageProps) {
   const simulator = useProofSimulator(props);
   const isRunning = simulator.busyAction === 'run';
@@ -34,12 +30,9 @@ export default function ProofSimulatorPage(props: ProofSimulatorPageProps) {
     <section className="dapp-panel proof-simulator" aria-label="Proof Simulator">
       <header className="proof-simulator-header">
         <div>
-          <p className="eyebrow">ProofStation diagnostics</p>
-          <h2>Midnight Proof Simulator</h2>
-          <p>
-            Generate genuine Compact proofs through 1AM without balancing or broadcasting the test calls.
-            Only deploying this harness writes to the chain.
-          </p>
+          <p className="eyebrow">Proof diagnostics</p>
+          <h2>Proof Simulator</h2>
+          <p>Generate real proofs through 1AM. Test calls are never broadcast.</p>
         </div>
         {!simulator.session && props.walletStatus === 'detected' && (
           <button type="button" className="button-primary" onClick={props.connectWallet}>
@@ -48,39 +41,41 @@ export default function ProofSimulatorPage(props: ProofSimulatorPageProps) {
         )}
       </header>
 
-      <section className="proof-simulator-note">
-        <strong>Range:</strong> useful Compact transaction circuits begin at k=6. Midnight exposes SRS tiers
-        through k=25; this bundle includes k=6–20, while k=21–25 require explicitly generated larger artifacts.
-      </section>
-
       <section className="proof-simulator-controls">
         <div className="proof-contract-card">
-          <span>Harness contract</span>
-          <code title={simulator.contractAddress}>{shortAddress(simulator.contractAddress)}</code>
+          <label htmlFor="proof-harness-address">Harness contract</label>
+          <input
+            id="proof-harness-address"
+            value={simulator.addressInput}
+            onChange={(event) => simulator.setAddressInput(event.target.value)}
+            placeholder="64-character contract address"
+            spellCheck={false}
+            disabled={!simulator.session || simulator.busyAction !== null}
+          />
           <span className={simulator.snapshotReady ? 'proof-ready' : 'proof-not-ready'}>
-            {simulator.snapshotReady ? 'Indexed and ready' : simulator.contractAddress ? 'State not loaded' : 'Deploy once'}
+            {simulator.snapshotReady ? 'Ready' : simulator.contractAddress ? 'Not loaded' : 'No harness'}
           </span>
         </div>
         <div className="proof-action-row">
           <button
             type="button"
             className="button-primary"
-            onClick={simulator.deploy}
-            disabled={!simulator.session || Boolean(simulator.contractAddress) || simulator.busyAction !== null}
+            onClick={simulator.loadAddress}
+            disabled={!simulator.session || !simulator.addressInput || simulator.busyAction !== null}
           >
-            {simulator.busyAction === 'deploy' ? 'Deploying...' : 'Deploy harness'}
+            Load
           </button>
           <button
             type="button"
             className="button-secondary"
-            onClick={simulator.refresh}
-            disabled={!simulator.session || !simulator.contractAddress || simulator.busyAction !== null}
+            onClick={simulator.deploy}
+            disabled={!simulator.session || simulator.busyAction !== null}
           >
-            Refresh state
+            {simulator.busyAction === 'deploy' ? 'Deploying...' : 'Deploy new'}
           </button>
-          <button type="button" onClick={simulator.clearContract} disabled={!simulator.contractAddress || simulator.busyAction !== null}>
-            Clear harness
-          </button>
+          {simulator.defaultContractAddress && simulator.addressInput !== simulator.defaultContractAddress && (
+            <button type="button" onClick={simulator.useDefaultContract} disabled={simulator.busyAction !== null}>Use default</button>
+          )}
         </div>
       </section>
 
@@ -90,13 +85,13 @@ export default function ProofSimulatorPage(props: ProofSimulatorPageProps) {
             <label>
               Start k
               <select value={simulator.rangeStart} onChange={(event) => simulator.setRangeStart(Number(event.target.value))} disabled={isRunning}>
-                {simulator.manifest.circuits.map((circuit) => <option key={circuit.circuitId} value={circuit.actualK}>{circuit.actualK}</option>)}
+                {simulator.manifest.circuits.map((circuit) => <option key={circuit.circuitId} value={circuit.actualK}>k={circuit.actualK}{circuit.actualK > 17 ? ' · experimental' : ''}</option>)}
               </select>
             </label>
             <label>
               End k
               <select value={simulator.rangeEnd} onChange={(event) => simulator.setRangeEnd(Number(event.target.value))} disabled={isRunning}>
-                {simulator.manifest.circuits.map((circuit) => <option key={circuit.circuitId} value={circuit.actualK}>{circuit.actualK}</option>)}
+                {simulator.manifest.circuits.map((circuit) => <option key={circuit.circuitId} value={circuit.actualK}>k={circuit.actualK}{circuit.actualK > 17 ? ' · experimental' : ''}</option>)}
               </select>
             </label>
           </div>
@@ -127,7 +122,6 @@ export default function ProofSimulatorPage(props: ProofSimulatorPageProps) {
               <tr>
                 <th>k</th>
                 <th>Rows</th>
-                <th>Private fields</th>
                 <th>Prover key</th>
                 <th>Status</th>
                 <th>Prove</th>
@@ -141,16 +135,18 @@ export default function ProofSimulatorPage(props: ProofSimulatorPageProps) {
                 const result = simulator.results[circuit.circuitId];
                 const status = result?.status ?? 'idle';
                 return (
-                  <tr key={circuit.circuitId}>
-                    <td><strong>{circuit.actualK}</strong></td>
-                    <td>{circuit.rows.toLocaleString()}</td>
-                    <td>{circuit.inputLength.toLocaleString()}</td>
-                    <td>{formatBytes(circuit.artifacts?.prover.bytes)}</td>
-                    <td><span className={`proof-status proof-status-${status}`}>{status}</span></td>
-                    <td>{formatDuration(result?.proofDurationMs)}</td>
-                    <td>{formatBytes(result?.proofBytes)}</td>
-                    <td>{formatDuration(result?.totalDurationMs)}</td>
-                    <td>
+                  <tr key={circuit.circuitId} className={circuit.actualK > 17 ? 'proof-tier-experimental' : undefined}>
+                    <td data-label="Tier">
+                      <strong>k={circuit.actualK}</strong>
+                      {circuit.actualK > 17 && <span className="proof-experimental">Experimental · expected to fail</span>}
+                    </td>
+                    <td data-label="Rows">{circuit.rows.toLocaleString()}</td>
+                    <td data-label="Prover key">{formatBytes(circuit.artifacts?.prover.bytes)}</td>
+                    <td data-label="Status"><span className={`proof-status proof-status-${status}`}>{status}</span></td>
+                    <td data-label="Prove">{formatDuration(result?.proofDurationMs)}</td>
+                    <td data-label="Proof size">{formatBytes(result?.proofBytes)}</td>
+                    <td data-label="Total">{formatDuration(result?.totalDurationMs)}</td>
+                    <td data-label="Action">
                       <button
                         type="button"
                         onClick={() => simulator.runOne(circuit)}
