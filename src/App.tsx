@@ -6,9 +6,10 @@ import LeaderboardPage from './features/leaderboard/ui/LeaderboardPage';
 import MintPage from './features/mint/ui/MintPage';
 import DepositReproPage from './features/depositRepro/ui/DepositReproPage';
 import TransferPage from './features/transfer/ui/TransferPage';
+import ProofSimulatorPage from './features/proofSimulator/ui/ProofSimulatorPage';
 import { connectOneAm, getOneAmWallet, type OneAmSession } from './oneAm';
 
-type WorkspaceTab = 'tasks' | 'leaderboard' | 'mint' | 'depositRepro' | 'transfer';
+type WorkspaceTab = 'tasks' | 'leaderboard' | 'mint' | 'depositRepro' | 'transfer' | 'proofSimulator';
 type WalletStatus = 'checking' | 'detected' | 'not-found';
 
 const BRAND_LOGO_SRC = '/branding/1am-logo-black.svg';
@@ -22,6 +23,7 @@ const WORKSPACE_TABS: Array<{ id: WorkspaceTab; label: string; description: stri
   { id: 'mint', label: 'Shielded Mint', description: 'Mint private wallet tokens' },
   { id: 'depositRepro', label: 'Shielded Deposit', description: 'Mint then deposit tokens' },
   { id: 'transfer', label: 'NIGHT Transfer', description: 'Send unshielded NIGHT' },
+  { id: 'proofSimulator', label: 'Proof Simulator', description: 'Probe ProofStation k tiers' },
 ];
 
 function shorten(value: string, head = 14, tail = 8): string {
@@ -201,6 +203,9 @@ function App() {
           </div>
           <div className="workspace-dapp" hidden={activeTab !== 'transfer'}>
             <TransferPage {...sharedDappProps} />
+          </div>
+          <div className="workspace-dapp" hidden={activeTab !== 'proofSimulator'}>
+            <ProofSimulatorPage {...sharedDappProps} />
           </div>
         </section>
 

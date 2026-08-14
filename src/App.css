@@ -987,6 +987,131 @@ dd {
   font-family: var(--font-mono);
 }
 
+.proof-simulator {
+  display: grid;
+  gap: 1rem;
+}
+
+.proof-simulator-header,
+.proof-simulator-controls,
+.proof-range-panel,
+.proof-action-row,
+.proof-range-fields {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.proof-simulator-header h2 {
+  margin: 0.15rem 0 0.35rem;
+}
+
+.proof-simulator-header p,
+.proof-simulator-note,
+.proof-contract-card span {
+  color: var(--muted-text, #5d625f);
+}
+
+.proof-simulator-note,
+.proof-contract-card,
+.proof-range-panel {
+  border: 1px solid var(--border-color, #d9ddd9);
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.proof-contract-card {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.proof-contract-card code {
+  overflow-wrap: anywhere;
+}
+
+.proof-ready { color: #177245 !important; }
+.proof-not-ready { color: #8a5b13 !important; }
+
+.proof-range-fields label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.proof-range-fields select {
+  min-width: 5rem;
+}
+
+.proof-action-row {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.proof-copy-feedback {
+  color: #177245;
+  font-size: 0.85rem;
+}
+
+.proof-table-wrap {
+  overflow-x: auto;
+}
+
+.proof-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 920px;
+}
+
+.proof-table th,
+.proof-table td {
+  border-bottom: 1px solid var(--border-color, #d9ddd9);
+  padding: 0.65rem 0.5rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.proof-table th {
+  color: var(--muted-text, #5d625f);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.proof-status {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 0.18rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.proof-status-idle { background: #ecefed; color: #59605c; }
+.proof-status-running { background: #fff1bf; color: #7c5700; }
+.proof-status-passed { background: #d9f4e5; color: #11653a; }
+.proof-status-failed { background: #ffe0dd; color: #9b2c24; }
+
+.proof-error-detail {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: #fff1ef;
+  color: #8a261f;
+  padding: 0.75rem;
+  border-radius: 8px;
+}
+
+@media (max-width: 760px) {
+  .proof-simulator-header,
+  .proof-simulator-controls,
+  .proof-range-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
 .debug-panel {
   margin-top: 0;
   display: flex;

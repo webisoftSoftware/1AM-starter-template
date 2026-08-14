@@ -35,6 +35,30 @@ export type MintDepositCircuitKeys = 'mintShielded' | 'depositShielded';
 export type MintDepositProviders = ContractProviders<any, MintDepositCircuitKeys, undefined>;
 export type DepositOnlyProviders = ContractProviders<any, 'depositShielded', undefined>;
 export type LeaderboardCircuitKeys = 'submitScore' | 'verifyOwnership';
+export type ProofSimulatorCircuitKey =
+  | 'probeK06'
+  | 'probeK07'
+  | 'probeK08'
+  | 'probeK09'
+  | 'probeK10'
+  | 'probeK11'
+  | 'probeK12'
+  | 'probeK13'
+  | 'probeK14'
+  | 'probeK15'
+  | 'probeK16'
+  | 'probeK17'
+  | 'probeK18'
+  | 'probeK19'
+  | 'probeK20';
+export type CircuitProofMetric = {
+  keyLocation: string;
+  durationMs: number;
+  proofBytes: number;
+};
+export type ProofSimulatorProviders = ContractProviders<any, ProofSimulatorCircuitKey, undefined> & {
+  consumeProofMetrics: () => CircuitProofMetric[];
+};
 export type LeaderboardPrivateStateId = 'leaderboardPrivateState';
 export type LeaderboardProviders = MidnightProviders<
   LeaderboardCircuitKeys,
@@ -748,5 +772,47 @@ export async function createLeaderboardProviders(session: OneAmSession): Promise
     proofProvider: createProofProvider(provingProvider),
     walletProvider,
     midnightProvider,
+  };
+}
+
+export async function createProofSimulatorProviders(session: OneAmSession): Promise<ProofSimulatorProviders> {
+  setNetworkId(session.config.networkId);
+
+  const privateStateProvider = createPrivateStateProvider();
+  const walletProvider = createWalletProvider(session);
+  const midnightProvider = createMidnightProvider(session);
+  const publicDataProvider = createPatchedPublicDataProvider(session.config.indexerUri, session.config.indexerWsUri);
+  const zkConfigProvider = new FetchZkConfigProvider<ProofSimulatorCircuitKey>(
+    new URL(APP_CONFIG.zkProofSimulatorAssetBasePath, window.location.origin).toString(),
+    createLoggingFetch('proof-simulator'),
+  );
+  const baseProvingProvider = await session.api.getProvingProvider(zkConfigProvider.asKeyMaterialProvider());
+  let metrics: CircuitProofMetric[] = [];
+  const provingProvider: ProvingProvider = {
+    check: (serializedPreimage, keyLocation) => baseProvingProvider.check(serializedPreimage, keyLocation),
+    prove: async (serializedPreimage, keyLocation, overwriteBindingInput) => {
+      const startedAt = performance.now();
+      const proof = await baseProvingProvider.prove(serializedPreimage, keyLocation, overwriteBindingInput);
+      metrics.push({
+        keyLocation,
+        durationMs: performance.now() - startedAt,
+        proofBytes: proof.byteLength,
+      });
+      return proof;
+    },
+  };
+
+  return {
+    privateStateProvider,
+    publicDataProvider,
+    zkConfigProvider,
+    proofProvider: createProofProvider(provingProvider),
+    walletProvider,
+    midnightProvider,
+    consumeProofMetrics: () => {
+      const current = metrics;
+      metrics = [];
+      return current;
+    },
   };
 }

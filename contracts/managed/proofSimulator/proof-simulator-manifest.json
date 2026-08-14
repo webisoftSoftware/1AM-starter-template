@@ -1,0 +1,326 @@
+{
+  "generatedAt": "2026-08-14T14:21:45.322Z",
+  "compilerVersion": "0.31.0",
+  "languageVersion": "0.23.0",
+  "runtimeVersion": "0.16.0",
+  "minK": 6,
+  "maxK": 20,
+  "complete": true,
+  "circuits": [
+    {
+      "circuitId": "probeK06",
+      "targetK": 6,
+      "actualK": 6,
+      "rows": 35,
+      "inputLength": 16,
+      "artifacts": {
+        "prover": {
+          "bytes": 18419,
+          "sha256": "45d6128897c23259b0dc4af728d337167872e150901971a5bb540de54f9c720e"
+        },
+        "verifier": {
+          "bytes": 1255,
+          "sha256": "50b3ba9f8a895cf17d119abd96f5e226367abeb4cca44e978ddfd5d5e42d1789"
+        },
+        "zkir": {
+          "bytes": 195,
+          "sha256": "d2b6c1e0b9caa3085044e7b19adf0f483c7ba16e16155cd4b2424ad697d8c5ea"
+        }
+      }
+    },
+    {
+      "circuitId": "probeK07",
+      "targetK": 7,
+      "actualK": 7,
+      "rows": 70,
+      "inputLength": 32,
+      "artifacts": {
+        "prover": {
+          "bytes": 35196,
+          "sha256": "169e61cf28e94ffb1192209375058c0a2e7b609c489345688e00ac7de0e93018"
+        },
+        "verifier": {
+          "bytes": 1255,
+          "sha256": "fc100dd7ef4eae3115990c1f8fd89997ac68cb7f3bd1217cc5c7d079f5fb3c99"
+        },
+        "zkir": {
+          "bytes": 343,
+          "sha256": "4d73a8595096505177162bc5bc25fe965a83143c464e5657bd52af8a6a01ff31"
+        }
+      }
+    },
+    {
+      "circuitId": "probeK08",
+      "targetK": 8,
+      "actualK": 8,
+      "rows": 140,
+      "inputLength": 64,
+      "artifacts": {
+        "prover": {
+          "bytes": 68689,
+          "sha256": "0e0646da6af5e0d84bcca0bebe23f650b42f9e564bd9f99cef9209b99524a00b"
+        },
+        "verifier": {
+          "bytes": 1255,
+          "sha256": "c71d4f29f2e97192482fab653fac24de4981765be0f68f994d0039eb366e9ea8"
+        },
+        "zkir": {
+          "bytes": 686,
+          "sha256": "b5b90cb8d685fdee38194fe73f1e10311b139b7d96147946b57bf2d1e0f4588e"
+        }
+      }
+    },
+    {
+      "circuitId": "probeK09",
+      "targetK": 9,
+      "actualK": 9,
+      "rows": 281,
+      "inputLength": 128,
+      "artifacts": {
+        "prover": {
+          "bytes": 135515,
+          "sha256": "7a12f959a6505df6f3bb1394aa5188377f9f7f2b212f2942a3389e8847fb0c55"
+        },
+        "verifier": {
+          "bytes": 1255,
+          "sha256": "cf4a267c4b5a5e82dea8f72ab3b3aa08496d3d10d5f2dc44116131ee1d9e9967"
+        },
+        "zkir": {
+          "bytes": 1326,
+          "sha256": "364fbb9cb91b5883a9195de43a0c9f7b8176935a68b73d46ca25ee835654d8f4"
+        }
+      }
+    },
+    {
+      "circuitId": "probeK10",
+      "targetK": 10,
+      "actualK": 10,
+      "rows": 563,
+      "inputLength": 256,
+      "artifacts": {
+        "prover": {
+          "bytes": 268803,
+          "sha256": "dac363da4637587f544480f2e5c82070632efd97aa6e32e0846c9deebe087b1d"
+        },
+        "verifier": {
+          "bytes": 1255,
+          "sha256": "7fc176d243987f541d2a07ecbd05e37bc7a0a0d63316ef4375bf71d0b08d63a7"
+        },
+        "zkir": {
+          "bytes": 2606,
+          "sha256": "d4de288fe41c8746980b5014907a90eac9f9234a9a340f71e463fb82738f3228"
+        }
+      }
+    },
+    {
+      "circuitId": "probeK11",
+      "targetK": 11,
+      "actualK": 11,
+      "rows": 1126,
+      "inputLength": 512,
+      "artifacts": {
+        "prover": {
+          "bytes": 534899,
+          "sha256": "9a03445f2ab2b9fe01cce09982da5eef87c324a86109adfbb36e6bd15d8f53a3"
+        },
+        "verifier": {
+          "bytes": 1255,
+          "sha256": "eaf4fc468f9f92ce43f7c615f8d0fcf29212c5e3ad393ca6754599ab5fdc6ecb"
+        },
+        "zkir": {
+          "bytes": 5166,
+          "sha256": "a06e44d1831b14f9fbb3f92866c4b4ee014abf4a47d178d1371907e6f6286cd5"
+        }
+      }
+    },
+    {
+      "circuitId": "probeK12",
+      "targetK": 12,
+      "actualK": 12,
+      "rows": 2252,
+      "inputLength": 1024,
+      "artifacts": {
+        "prover": {
+          "bytes": 1065777,
+          "sha256": "c5d186998f901e78d3f1fe74e59e368481e6d3d029b64f844d235635b449055b"
+        },
+        "verifier": {
+          "bytes": 1255,
+          "sha256": "9cb94a9ebc4afea28cd8e9883fadd081f73bf060e3073de6ccad6c49d197a24e"
+        },
+        "zkir": {
+          "bytes": 10286,
+          "sha256": "a5e2aaea0cb05a2affb6245b4dd4857dadd2d396801009c94879339339ca1fc8"
+        }
+      }
+    },
+    {
+      "circuitId": "probeK13",
+      "targetK": 13,
+      "actualK": 13,
+      "rows": 4505,
+      "inputLength": 2048,
+      "artifacts": {
+        "prover": {
+          "bytes": 2127095,
+          "sha256": "9ebbcc86ef2106900f5fd15f69881190f6ea5f0568d8fe668934b5f75fdd6919"
+        },
+        "verifier": {
+          "bytes": 1255,
+          "sha256": "55d8731c93bb03a22ed70e77a7a1ccff965ef966db75f08d1460e896342fbbaa"
+        },
+        "zkir": {
+          "bytes": 20526,
+          "sha256": "567adee74741a40000415250058567b36752afc0b8280a72c78b63f4c0102f11"
+        }
+      }
+    },
+    {
+      "circuitId": "probeK14",
+      "targetK": 14,
+      "actualK": 14,
+      "rows": 9011,
+      "inputLength": 4096,
+      "artifacts": {
+        "prover": {
+          "bytes": 4248878,
+          "sha256": "07a8cb2be897ce7443320ef9da5cdce75c2358efe7fe74efc64b6e537f09a359"
+        },
+        "verifier": {
+          "bytes": 1255,
+          "sha256": "d03dfe6c9293f804731cdf828673a17a2281430f0e205200841b3a6ddf0bcda5"
+        },
+        "zkir": {
+          "bytes": 41006,
+          "sha256": "12591315d54a4eefee3b0eb2c3ef351bb4377faccda6772363e80e2299650df3"
+        }
+      }
+    },
+    {
+      "circuitId": "probeK15",
+      "targetK": 15,
+      "actualK": 15,
+      "rows": 18022,
+      "inputLength": 8192,
+      "artifacts": {
+        "prover": {
+          "bytes": 8483265,
+          "sha256": "fafb4b719c7a25d946c76e8208d9f54378f80989a0738c96adf9e16e9568532b"
+        },
+        "verifier": {
+          "bytes": 1255,
+          "sha256": "a7dd4fa19575c246cc4fb60192965f486184a2c72d6a3e2c1a6479fc5c889754"
+        },
+        "zkir": {
+          "bytes": 106550,
+          "sha256": "06477ecee28ae53af756b26002979d840828b0a1d2f4bdcf8f7d515d2405b768"
+        }
+      }
+    },
+    {
+      "circuitId": "probeK16",
+      "targetK": 16,
+      "actualK": 16,
+      "rows": 36044,
+      "inputLength": 16384,
+      "artifacts": {
+        "prover": {
+          "bytes": 16941118,
+          "sha256": "c93a063c9c5a10eda12bdb2a2651d7720ed30661313d72e9dbf3b110cc2a9009"
+        },
+        "verifier": {
+          "bytes": 1255,
+          "sha256": "4152af12813a6bf3fcb907cda8565c78e6d67a16e65a843538c480399140b2b8"
+        },
+        "zkir": {
+          "bytes": 262212,
+          "sha256": "2df462a7a5c5e761534ae335f7e57036a24361a2fe15cc3e91749a7130076305"
+        }
+      }
+    },
+    {
+      "circuitId": "probeK17",
+      "targetK": 17,
+      "actualK": 17,
+      "rows": 72089,
+      "inputLength": 32768,
+      "artifacts": {
+        "prover": {
+          "bytes": 33881918,
+          "sha256": "92af9d1cc8266fb0529bdc7cec646981def72217132b545d70a7c01e1c6fced0"
+        },
+        "verifier": {
+          "bytes": 1255,
+          "sha256": "d28da13128ba5728e52cc81c10de17071bd999fda5e5dfa12fbf2393e0975b48"
+        },
+        "zkir": {
+          "bytes": 557124,
+          "sha256": "2fff4100752bb5ad977536f480eebcb5f23a18736364974843da235e04599190"
+        }
+      }
+    },
+    {
+      "circuitId": "probeK18",
+      "targetK": 18,
+      "actualK": 18,
+      "rows": 144179,
+      "inputLength": 65536,
+      "artifacts": {
+        "prover": {
+          "bytes": 67762208,
+          "sha256": "d18d51ab457d7f6b42dbe602b1138ee3c1045cf71206b0e5a241bbd62ef99dad"
+        },
+        "verifier": {
+          "bytes": 1255,
+          "sha256": "7464e6455d51a6f21357d10934a4e5e8f51faeb5a39bcb0ad05e5ae4f547d990"
+        },
+        "zkir": {
+          "bytes": 1146948,
+          "sha256": "9f681bd3ba81d2dd622a75767554700b7b694ca2153a1fb6f7e52436f3655486"
+        }
+      }
+    },
+    {
+      "circuitId": "probeK19",
+      "targetK": 19,
+      "actualK": 19,
+      "rows": 288358,
+      "inputLength": 131072,
+      "artifacts": {
+        "prover": {
+          "bytes": 135518550,
+          "sha256": "6659ef4aeb157e725a04446452114b469723635cbc7487b87229b9197d7f8957"
+        },
+        "verifier": {
+          "bytes": 1255,
+          "sha256": "18d6f87c862cf72e82c0273e3e872e9949e1fd85e77137742efaa00f06961db2"
+        },
+        "zkir": {
+          "bytes": 2326596,
+          "sha256": "19e8f12e878c65bda92b79476137fde8159e8987d7aefffa874399c36a71b25c"
+        }
+      }
+    },
+    {
+      "circuitId": "probeK20",
+      "targetK": 20,
+      "actualK": 20,
+      "rows": 576716,
+      "inputLength": 262144,
+      "artifacts": {
+        "prover": {
+          "bytes": 271028261,
+          "sha256": "72254de1e913099ab25ebd755fd454c20d93ea3ef9f817aa9b415e0bd9a86f49"
+        },
+        "verifier": {
+          "bytes": 1255,
+          "sha256": "80008f6aa84b1b34c8685cccbe2f5e9e5406250c4e2cab6feb52a7ceb984743b"
+        },
+        "zkir": {
+          "bytes": 4685892,
+          "sha256": "069adb1ee8b4fc526d563546f5ca9b75c867cdbea74e9e6b41ab07bf4df778c7"
+        }
+      }
+    }
+  ]
+}

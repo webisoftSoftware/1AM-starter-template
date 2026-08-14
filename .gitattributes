@@ -1,0 +1,1 @@
+contracts/managed/proofSimulator/keys/*.prover filter=lfs diff=lfs merge=lfs -text

@@ -51,4 +51,8 @@ export const APP_CONFIG = {
     import.meta.env.VITE_ZK_LEADERBOARD_ASSET_BASE_PATH,
     '/zk/leaderboard',
   ),
+  zkProofSimulatorAssetBasePath: readNonEmpty(
+    import.meta.env.VITE_ZK_PROOF_SIMULATOR_ASSET_BASE_PATH,
+    '/zk/proofSimulator',
+  ),
 } as const;

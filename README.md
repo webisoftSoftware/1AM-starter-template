@@ -94,3 +94,25 @@ npm run prepare:todo
 ```
 
 This recompiles both TODO contracts and syncs the generated `keys/` and `zkir/` directories into `public/zk/...` so the browser can fetch them.
+
+## Proof simulator
+
+The **Proof Simulator** workspace tab deploys one diagnostic contract, then creates genuine
+Compact call proofs through the connected 1AM wallet without balancing or broadcasting the
+test calls. The bundled circuits cover `k=6` through `k=20`; Midnight supports parameters up
+to `k=25`, but the larger tiers must be generated explicitly and require substantially more
+disk, memory, and proving time.
+
+The generated prover keys are stored with Git LFS. Install and initialize it before generating
+or checking out the artifact bundle:
+
+```sh
+brew install git-lfs
+git lfs install
+npm run generate:proof-simulator
+npm run validate:proof-simulator
+```
+
+Use `npm run calibrate:proof-simulator` to validate circuit sizing without generating proving
+keys. The generator accepts `--min-k` and `--max-k` bounds between 6 and 25. Vite and Docker
+copy the managed artifacts into `public/zk/proofSimulator` during their normal prebuild step.
