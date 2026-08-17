@@ -124,9 +124,9 @@ export default function ProofSimulatorPage(props: ProofSimulatorPageProps) {
                 <th>Rows</th>
                 <th>Prover key</th>
                 <th>Status</th>
-                <th>Prove</th>
+                <th title="The complete 1AM proving-provider call, including wallet and transport overhead.">Provider round trip</th>
                 <th>Proof bytes</th>
-                <th>Total</th>
+                <th title="Unproven transaction construction, checking, and proving.">Build + prove</th>
                 <th></th>
               </tr>
             </thead>
@@ -143,9 +143,9 @@ export default function ProofSimulatorPage(props: ProofSimulatorPageProps) {
                     <td data-label="Rows">{circuit.rows.toLocaleString()}</td>
                     <td data-label="Prover key">{formatBytes(circuit.artifacts?.prover.bytes)}</td>
                     <td data-label="Status"><span className={`proof-status proof-status-${status}`}>{status}</span></td>
-                    <td data-label="Prove">{formatDuration(result?.proofDurationMs)}</td>
+                    <td data-label="Provider round trip">{formatDuration(result?.providerRoundTripMs)}</td>
                     <td data-label="Proof size">{formatBytes(result?.proofBytes)}</td>
-                    <td data-label="Total">{formatDuration(result?.totalDurationMs)}</td>
+                    <td data-label="Build + prove">{formatDuration(result?.buildAndProveMs)}</td>
                     <td data-label="Action">
                       <button
                         type="button"

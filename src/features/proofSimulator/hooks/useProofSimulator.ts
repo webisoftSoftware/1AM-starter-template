@@ -213,15 +213,15 @@ export function useProofSimulator({
           args: [randomFieldVector(circuit.inputLength)],
         } as any);
         await session.providers.proofProvider.proveTx(callTxData.private.unprovenTx);
-        const totalDurationMs = performance.now() - startedAt;
+        const buildAndProveMs = performance.now() - startedAt;
         const proofMetrics = session.providers.consumeProofMetrics();
         const passed: ProofRunResult = {
           circuitId: circuit.circuitId,
           k: circuit.actualK,
           status: 'passed',
-          proofDurationMs: proofMetrics.reduce((sum, metric) => sum + metric.durationMs, 0),
+          providerRoundTripMs: proofMetrics.reduce((sum, metric) => sum + metric.providerRoundTripMs, 0),
           proofBytes: proofMetrics.reduce((sum, metric) => sum + metric.proofBytes, 0),
-          totalDurationMs,
+          buildAndProveMs,
           timestamp: new Date().toISOString(),
         };
         setResults((current) => ({ ...current, [circuit.circuitId]: passed }));
@@ -231,7 +231,7 @@ export function useProofSimulator({
           circuitId: circuit.circuitId,
           k: circuit.actualK,
           status: 'failed',
-          totalDurationMs: performance.now() - startedAt,
+          buildAndProveMs: performance.now() - startedAt,
           timestamp: new Date().toISOString(),
           error: errorMessage(proveError),
         };

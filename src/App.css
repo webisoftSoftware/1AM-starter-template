@@ -1065,7 +1065,7 @@ dd {
 .proof-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 780px;
+  min-width: 880px;
 }
 
 .proof-table th,

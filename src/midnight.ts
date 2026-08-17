@@ -53,7 +53,7 @@ export type ProofSimulatorCircuitKey =
   | 'probeK20';
 export type CircuitProofMetric = {
   keyLocation: string;
-  durationMs: number;
+  providerRoundTripMs: number;
   proofBytes: number;
 };
 export type ProofSimulatorProviders = ContractProviders<any, ProofSimulatorCircuitKey, undefined> & {
@@ -795,7 +795,7 @@ export async function createProofSimulatorProviders(session: OneAmSession): Prom
       const proof = await baseProvingProvider.prove(serializedPreimage, keyLocation, overwriteBindingInput);
       metrics.push({
         keyLocation,
-        durationMs: performance.now() - startedAt,
+        providerRoundTripMs: performance.now() - startedAt,
         proofBytes: proof.byteLength,
       });
       return proof;

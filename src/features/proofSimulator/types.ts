@@ -36,9 +36,9 @@ export type ProofRunResult = {
   circuitId: ProofSimulatorCircuitKey;
   k: number;
   status: ProofRunStatus;
-  proofDurationMs?: number;
+  providerRoundTripMs?: number;
   proofBytes?: number;
-  totalDurationMs?: number;
+  buildAndProveMs?: number;
   timestamp?: string;
   error?: string;
 };
