@@ -17,6 +17,7 @@ import {
   type PrivateStateExport,
   type PrivateStateId,
   type PrivateStateProvider,
+  type ProofProvider,
   type PublicDataProvider,
   type SigningKeyExport,
   type UnboundTransaction,
@@ -56,7 +57,12 @@ export type CircuitProofMetric = {
   providerRoundTripMs: number;
   proofBytes: number;
 };
+export type ProofSimulatorProofLane = {
+  proofProvider: ProofProvider;
+  consumeProofMetrics: () => CircuitProofMetric[];
+};
 export type ProofSimulatorProviders = ContractProviders<any, ProofSimulatorCircuitKey, undefined> & {
+  createProofLane: () => ProofSimulatorProofLane;
   consumeProofMetrics: () => CircuitProofMetric[];
 };
 export type LeaderboardPrivateStateId = 'leaderboardPrivateState';
@@ -787,32 +793,40 @@ export async function createProofSimulatorProviders(session: OneAmSession): Prom
     createLoggingFetch('proof-simulator'),
   );
   const baseProvingProvider = await session.api.getProvingProvider(zkConfigProvider.asKeyMaterialProvider());
-  let metrics: CircuitProofMetric[] = [];
-  const provingProvider: ProvingProvider = {
-    check: (serializedPreimage, keyLocation) => baseProvingProvider.check(serializedPreimage, keyLocation),
-    prove: async (serializedPreimage, keyLocation, overwriteBindingInput) => {
-      const startedAt = performance.now();
-      const proof = await baseProvingProvider.prove(serializedPreimage, keyLocation, overwriteBindingInput);
-      metrics.push({
-        keyLocation,
-        providerRoundTripMs: performance.now() - startedAt,
-        proofBytes: proof.byteLength,
-      });
-      return proof;
-    },
+  const createProofLane = (): ProofSimulatorProofLane => {
+    let metrics: CircuitProofMetric[] = [];
+    const provingProvider: ProvingProvider = {
+      check: (serializedPreimage, keyLocation) => baseProvingProvider.check(serializedPreimage, keyLocation),
+      prove: async (serializedPreimage, keyLocation, overwriteBindingInput) => {
+        const startedAt = performance.now();
+        const proof = await baseProvingProvider.prove(serializedPreimage, keyLocation, overwriteBindingInput);
+        metrics.push({
+          keyLocation,
+          providerRoundTripMs: performance.now() - startedAt,
+          proofBytes: proof.byteLength,
+        });
+        return proof;
+      },
+    };
+    return {
+      proofProvider: createProofProvider(provingProvider),
+      consumeProofMetrics: () => {
+        const current = metrics;
+        metrics = [];
+        return current;
+      },
+    };
   };
+  const defaultProofLane = createProofLane();
 
   return {
     privateStateProvider,
     publicDataProvider,
     zkConfigProvider,
-    proofProvider: createProofProvider(provingProvider),
+    proofProvider: defaultProofLane.proofProvider,
     walletProvider,
     midnightProvider,
-    consumeProofMetrics: () => {
-      const current = metrics;
-      metrics = [];
-      return current;
-    },
+    createProofLane,
+    consumeProofMetrics: defaultProofLane.consumeProofMetrics,
   };
 }

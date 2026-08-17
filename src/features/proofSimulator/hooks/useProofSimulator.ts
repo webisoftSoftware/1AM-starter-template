@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { sampleSigningKey } from '@midnight-ntwrk/compact-runtime';
+import type { UnprovenTransaction } from '@midnight-ntwrk/ledger-v8';
 import {
   createUnprovenCallTx,
   createUnprovenDeployTx,
@@ -12,6 +13,7 @@ import {
   createProofSimulatorProviders,
   waitForDeploySettled,
   type ProofSimulatorCircuitKey,
+  type ProofSimulatorProofLane,
   type ProofSimulatorProviders,
 } from '../../../midnight';
 import type { OneAmSession } from '../../../oneAm';
@@ -22,8 +24,12 @@ import {
 } from '../data/proofSimulatorStorage';
 import type {
   ProofCircuitManifest,
+  ProofBenchmarkRun,
+  ProofBenchmarkSample,
   ProofRunResult,
   ProofSimulatorManifest,
+  ProofSimulatorMode,
+  ProofTimingProfile,
   WalletStatus,
 } from '../types';
 
@@ -74,8 +80,20 @@ export function useProofSimulator({
   const [feedback, setFeedback] = useState('Connect 1AM to load the harness.');
   const [error, setError] = useState('');
   const [results, setResults] = useState<Record<string, ProofRunResult>>({});
+  const [mode, setMode] = useState<ProofSimulatorMode>('quick');
   const [rangeStart, setRangeStart] = useState(6);
   const [rangeEnd, setRangeEnd] = useState(17);
+  const [benchmarkK, setBenchmarkK] = useState(12);
+  const [warmups, setWarmups] = useState(1);
+  const [iterations, setIterations] = useState(5);
+  const [timingProfile, setTimingProfile] = useState<ProofTimingProfile>('proof-only');
+  const [loadWorkload, setLoadWorkload] = useState<'single' | 'mixed'>('single');
+  const [loadK, setLoadK] = useState(12);
+  const [loadRangeStart, setLoadRangeStart] = useState(8);
+  const [loadRangeEnd, setLoadRangeEnd] = useState(16);
+  const [loadRequests, setLoadRequests] = useState(8);
+  const [concurrency, setConcurrency] = useState(2);
+  const [benchmarkRun, setBenchmarkRun] = useState<ProofBenchmarkRun | null>(null);
   const [copyFeedback, setCopyFeedback] = useState('');
   const stopRequested = useRef(false);
 
@@ -92,6 +110,11 @@ export function useProofSimulator({
         setManifest(nextManifest);
         setRangeStart(nextManifest.minK);
         setRangeEnd(Math.min(17, nextManifest.maxK));
+        const defaultK = Math.min(12, nextManifest.maxK);
+        setBenchmarkK(defaultK);
+        setLoadK(defaultK);
+        setLoadRangeStart(Math.min(8, nextManifest.maxK));
+        setLoadRangeEnd(Math.min(16, nextManifest.maxK));
       } catch (manifestError) {
         if (!cancelled) setError(`Unable to load proof simulator artifacts: ${errorMessage(manifestError)}`);
       }
@@ -203,7 +226,7 @@ export function useProofSimulator({
       const running: ProofRunResult = { circuitId: circuit.circuitId, k: circuit.actualK, status: 'running' };
       setResults((current) => ({ ...current, [circuit.circuitId]: running }));
       setFeedback(`Creating a genuine k=${circuit.actualK} proof through 1AM...`);
-      session.providers.consumeProofMetrics();
+      const proofLane = session.providers.createProofLane();
       const startedAt = performance.now();
       try {
         const callTxData = await createUnprovenCallTx(session.providers, {
@@ -212,9 +235,9 @@ export function useProofSimulator({
           circuitId: circuit.circuitId,
           args: [randomFieldVector(circuit.inputLength)],
         } as any);
-        await session.providers.proofProvider.proveTx(callTxData.private.unprovenTx);
+        await proofLane.proofProvider.proveTx(callTxData.private.unprovenTx);
         const buildAndProveMs = performance.now() - startedAt;
-        const proofMetrics = session.providers.consumeProofMetrics();
+        const proofMetrics = proofLane.consumeProofMetrics();
         const passed: ProofRunResult = {
           circuitId: circuit.circuitId,
           k: circuit.actualK,
@@ -235,7 +258,7 @@ export function useProofSimulator({
           timestamp: new Date().toISOString(),
           error: errorMessage(proveError),
         };
-        session.providers.consumeProofMetrics();
+        proofLane.consumeProofMetrics();
         setResults((current) => ({ ...current, [circuit.circuitId]: failed }));
         debugError('proofSimulator', 'prove:error', proveError);
       }
@@ -245,10 +268,219 @@ export function useProofSimulator({
     setFeedback(stopRequested.current ? 'Stopped after the current proof.' : 'Proof run finished. No test calls were broadcast.');
   };
 
+  const createBenchmarkCall = async (circuit: ProofCircuitManifest): Promise<UnprovenTransaction> => {
+    if (!session) throw new Error('Connect 1AM before running a benchmark.');
+    const callTxData = await createUnprovenCallTx(session.providers, {
+      compiledContract: compiledProofSimulatorContract,
+      contractAddress,
+      circuitId: circuit.circuitId,
+      args: [randomFieldVector(circuit.inputLength)],
+    } as any);
+    return callTxData.private.unprovenTx;
+  };
+
+  const executeBenchmarkSample = async (
+    circuit: ProofCircuitManifest,
+    sample: number,
+    warmup: boolean,
+    profile: ProofTimingProfile,
+    proofLane: ProofSimulatorProofLane,
+    preparedTx?: UnprovenTransaction,
+    batch?: number,
+    slot?: number,
+  ): Promise<ProofBenchmarkSample> => {
+    const endToEndStartedAt = performance.now();
+    let proveStartedAt: number | undefined;
+    try {
+      const unprovenTx = preparedTx ?? await createBenchmarkCall(circuit);
+      proofLane.consumeProofMetrics();
+      proveStartedAt = performance.now();
+      await proofLane.proofProvider.proveTx(unprovenTx);
+      const proveTxMs = performance.now() - proveStartedAt;
+      const proofMetrics = proofLane.consumeProofMetrics();
+      return {
+        sample,
+        circuitId: circuit.circuitId,
+        k: circuit.actualK,
+        warmup,
+        status: 'passed',
+        batch,
+        slot,
+        proveTxMs,
+        providerRoundTripMs: proofMetrics.reduce((sum, metric) => sum + metric.providerRoundTripMs, 0),
+        endToEndMs: profile === 'end-to-end' ? performance.now() - endToEndStartedAt : undefined,
+        proofBytes: proofMetrics.reduce((sum, metric) => sum + metric.proofBytes, 0),
+        timestamp: new Date().toISOString(),
+      };
+    } catch (sampleError) {
+      proofLane.consumeProofMetrics();
+      return {
+        sample,
+        circuitId: circuit.circuitId,
+        k: circuit.actualK,
+        warmup,
+        status: 'failed',
+        batch,
+        slot,
+        proveTxMs: proveStartedAt === undefined ? undefined : performance.now() - proveStartedAt,
+        endToEndMs: profile === 'end-to-end' ? performance.now() - endToEndStartedAt : undefined,
+        timestamp: new Date().toISOString(),
+        error: errorMessage(sampleError),
+      };
+    }
+  };
+
+  const runPerformanceTest = async (
+    runMode: 'benchmark' | 'load',
+    circuits: ProofCircuitManifest[],
+    measuredCount: number,
+    workerCount: number,
+  ) => {
+    if (!session || !contractAddress || !snapshotReady || circuits.length === 0) return;
+    const runId = crypto.randomUUID();
+    const nextRun: ProofBenchmarkRun = {
+      id: runId,
+      mode: runMode,
+      status: 'running',
+      timingProfile,
+      circuitKs: circuits.map((circuit) => circuit.actualK),
+      warmups,
+      iterations: measuredCount,
+      concurrency: workerCount,
+      startedAt: new Date().toISOString(),
+      samples: [],
+    };
+    const appendSample = (sample: ProofBenchmarkSample) => {
+      nextRun.samples.push(sample);
+      setBenchmarkRun({ ...nextRun, samples: [...nextRun.samples] });
+    };
+    const replaceSample = (sample: ProofBenchmarkSample) => {
+      const sampleIndex = nextRun.samples.findIndex(
+        (candidate) => candidate.warmup === sample.warmup && candidate.sample === sample.sample,
+      );
+      if (sampleIndex >= 0) nextRun.samples[sampleIndex] = sample;
+      else nextRun.samples.push(sample);
+      setBenchmarkRun({ ...nextRun, samples: [...nextRun.samples] });
+    };
+    let runFailed = false;
+
+    stopRequested.current = false;
+    setBenchmarkRun(nextRun);
+    setBusyAction('run');
+    setError('');
+    setCopyFeedback('');
+    setFeedback(`Warming up ${circuits.length === 1 ? `k=${circuits[0].actualK}` : 'the mixed workload'}...`);
+
+    try {
+      const warmupLane = session.providers.createProofLane();
+      for (let index = 0; index < warmups && !stopRequested.current; index += 1) {
+        const circuit = circuits[index % circuits.length];
+        const preparedTx = timingProfile === 'proof-only' ? await createBenchmarkCall(circuit) : undefined;
+        appendSample(await executeBenchmarkSample(circuit, index + 1, true, timingProfile, warmupLane, preparedTx));
+      }
+
+      if (stopRequested.current) {
+        nextRun.measuredElapsedMs = 0;
+        return;
+      }
+
+      const jobs = Array.from({ length: measuredCount }, (_, index) => ({
+        index,
+        circuit: circuits[index % circuits.length],
+      }));
+      const prepared: Array<(typeof jobs)[number] & { tx: UnprovenTransaction | undefined }> = [];
+      for (const job of jobs) {
+        if (stopRequested.current) break;
+        prepared.push({
+          ...job,
+          tx: timingProfile === 'proof-only' ? await createBenchmarkCall(job.circuit) : undefined,
+        });
+      }
+      if (stopRequested.current) {
+        nextRun.measuredElapsedMs = 0;
+        return;
+      }
+
+      setFeedback(runMode === 'load'
+        ? `Running ${measuredCount} requests with concurrency ${workerCount}...`
+        : `Measuring ${measuredCount} proof${measuredCount === 1 ? '' : 's'}...`);
+      const measuredStartedAt = performance.now();
+      const proofLanes = Array.from({ length: workerCount }, () => session.providers.createProofLane());
+      prepared.forEach((job, index) => appendSample({
+        sample: job.index + 1,
+        circuitId: job.circuit.circuitId,
+        k: job.circuit.actualK,
+        warmup: false,
+        status: 'queued',
+        batch: runMode === 'load' ? Math.floor(index / workerCount) + 1 : undefined,
+        slot: runMode === 'load' ? index % workerCount + 1 : undefined,
+        timestamp: new Date().toISOString(),
+      }));
+      for (let offset = 0; offset < prepared.length && !stopRequested.current; offset += workerCount) {
+        const batchJobs = prepared.slice(offset, offset + workerCount);
+        const batch = Math.floor(offset / workerCount) + 1;
+        if (runMode === 'load') {
+          setFeedback(`Running batch ${batch} of ${Math.ceil(prepared.length / workerCount)} · ${batchJobs.length} request${batchJobs.length === 1 ? '' : 's'} together...`);
+        }
+        batchJobs.forEach((job, slotIndex) => replaceSample({
+          sample: job.index + 1,
+          circuitId: job.circuit.circuitId,
+          k: job.circuit.actualK,
+          warmup: false,
+          status: 'running',
+          batch: runMode === 'load' ? batch : undefined,
+          slot: runMode === 'load' ? slotIndex + 1 : undefined,
+          timestamp: new Date().toISOString(),
+        }));
+        const completedBatch = await Promise.all(batchJobs.map((job, slotIndex) => executeBenchmarkSample(
+          job.circuit,
+          job.index + 1,
+          false,
+          timingProfile,
+          proofLanes[slotIndex],
+          job.tx,
+          runMode === 'load' ? batch : undefined,
+          runMode === 'load' ? slotIndex + 1 : undefined,
+        )));
+        completedBatch.forEach(replaceSample);
+      }
+      nextRun.measuredElapsedMs = performance.now() - measuredStartedAt;
+    } catch (runError) {
+      runFailed = true;
+      setError(errorMessage(runError));
+      debugError('proofSimulator', 'benchmark:error', runError);
+    } finally {
+      nextRun.status = stopRequested.current ? 'stopped' : runFailed ? 'failed' : 'completed';
+      nextRun.finishedAt = new Date().toISOString();
+      setBenchmarkRun({ ...nextRun, samples: [...nextRun.samples] });
+      setBusyAction(null);
+      setFeedback(stopRequested.current
+        ? 'Stopped. Active proof requests were allowed to finish.'
+        : 'Benchmark finished. No test calls were balanced or broadcast.');
+      debugLog('proofSimulator', 'benchmark:complete', nextRun);
+    }
+  };
+
   const selectedCircuits = useMemo(
     () => manifest?.circuits.filter((circuit) => circuit.actualK >= rangeStart && circuit.actualK <= rangeEnd) ?? [],
     [manifest, rangeEnd, rangeStart],
   );
+
+  const circuitForK = useCallback(
+    (k: number) => manifest?.circuits.find((circuit) => circuit.actualK === k),
+    [manifest],
+  );
+
+  const loadCircuits = useMemo(() => {
+    if (!manifest) return [];
+    if (loadWorkload === 'single') {
+      const circuit = manifest.circuits.find((candidate) => candidate.actualK === loadK);
+      return circuit ? [circuit] : [];
+    }
+    return manifest.circuits.filter(
+      (circuit) => circuit.actualK >= loadRangeStart && circuit.actualK <= loadRangeEnd,
+    );
+  }, [loadK, loadRangeEnd, loadRangeStart, loadWorkload, manifest]);
 
   const updateAddressInput = (value: string) => {
     setAddressInput(value.trim());
@@ -266,6 +498,7 @@ export function useProofSimulator({
     setContractAddress(nextAddress);
     setAddressInput(nextAddress);
     setResults({});
+    setBenchmarkRun(null);
     return refreshSnapshot(session, nextAddress);
   };
 
@@ -278,6 +511,7 @@ export function useProofSimulator({
     setAddressInput(defaultAddress);
     setSnapshotReady(false);
     setResults({});
+    setBenchmarkRun(null);
     setError('');
     return refreshSnapshot(session, defaultAddress);
   };
@@ -296,6 +530,7 @@ export function useProofSimulator({
         k: circuit.actualK,
         status: 'idle',
       }),
+      benchmarkRun,
     }, null, 2));
     setCopyFeedback('Results copied.');
   };
@@ -314,11 +549,35 @@ export function useProofSimulator({
     feedback,
     error,
     results,
+    mode,
+    setMode,
     rangeStart,
     setRangeStart,
     rangeEnd,
     setRangeEnd,
     selectedCircuits,
+    benchmarkK,
+    setBenchmarkK,
+    warmups,
+    setWarmups,
+    iterations,
+    setIterations,
+    timingProfile,
+    setTimingProfile,
+    loadWorkload,
+    setLoadWorkload,
+    loadK,
+    setLoadK,
+    loadRangeStart,
+    setLoadRangeStart,
+    loadRangeEnd,
+    setLoadRangeEnd,
+    loadRequests,
+    setLoadRequests,
+    concurrency,
+    setConcurrency,
+    benchmarkRun,
+    loadCircuits,
     copyFeedback,
     deploy,
     setAddressInput: updateAddressInput,
@@ -327,8 +586,14 @@ export function useProofSimulator({
     refresh: () => session && contractAddress ? refreshSnapshot(session, contractAddress) : Promise.resolve(false),
     runSelected: () => runCircuits(selectedCircuits),
     runOne: (circuit: ProofCircuitManifest) => runCircuits([circuit]),
+    runBenchmark: () => {
+      const circuit = circuitForK(benchmarkK);
+      return circuit ? runPerformanceTest('benchmark', [circuit], iterations, 1) : Promise.resolve();
+    },
+    runLoadTest: () => runPerformanceTest('load', loadCircuits, loadRequests, concurrency),
     requestStop: () => { stopRequested.current = true; },
     clearResults: () => setResults({}),
+    clearBenchmark: () => setBenchmarkRun(null),
     copyResults,
   };
 }
